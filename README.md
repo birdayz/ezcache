@@ -9,3 +9,5 @@
 - Metrics
 - Capacity
 - TTL
+- Work with binary data (for both in-mem and semi persistent storage); employ marshalers/unmarshalers
+- Consider using mmap for the storage
