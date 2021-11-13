@@ -1,0 +1,11 @@
+## Goals
+- Cache Loader support
+- Cache Loader with current entry (-> Multiple implementations for the cache loader possible)
+- Bulk Loader
+- TBD: Sync vs Async load. What would it mean?
+- Refresh Ahead
+- Invalidation via stream?
+- Cache errors?
+- Metrics
+- Capacity
+- TTL
