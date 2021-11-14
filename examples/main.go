@@ -5,6 +5,7 @@ import (
 	"hash/fnv"
 
 	"github.com/birdayz/ezcache"
+	"github.com/davecgh/go-spew/spew"
 )
 
 type TestKey struct {
@@ -15,7 +16,6 @@ type TestKey struct {
 
 func (t TestKey) String() string {
 	return t.bleh
-
 }
 
 func main() {
@@ -25,11 +25,12 @@ func main() {
 		func(key *TestKey) (string, error) {
 			return "value", nil
 		},
-		func(key *TestKey) uint32 {
-			h := fnv.New32a()
+		func(key *TestKey) uint64 {
+			h := fnv.New64a()
 			h.Write([]byte(key.bleh))
-			return h.Sum32()
+			return h.Sum64()
 		},
+		2,
 	)
 
 	k := &TestKey{
@@ -40,6 +41,8 @@ func main() {
 	a.Set(k, "my-value")
 
 	res, err := a.Get(k)
-	fmt.Println(res, err)
+	fmt.Println("Got back", res, err)
+
+	spew.Dump(a)
 
 }
