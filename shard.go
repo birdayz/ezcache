@@ -10,8 +10,8 @@ type shard[K comparable, V comparable] struct {
 }
 
 func (s *shard[K, V]) set(key K, value V) {
-	//s.m.Lock()
-	//defer s.m.Unlock()
+	s.m.Lock()
+	defer s.m.Unlock()
 
 	keyHash := s.hasher(key)
 
@@ -30,8 +30,8 @@ func (s *shard[K, V]) set(key K, value V) {
 }
 
 func (s *shard[K, V]) get(key K) V {
-	//s.m.RLock()
-	//defer s.m.RUnlock()
+	s.m.RLock()
+	defer s.m.RUnlock()
 
 	keyHash := s.hasher(key)
 
@@ -45,8 +45,8 @@ func (s *shard[K, V]) get(key K) V {
 }
 
 func (s *shard[K, V]) delete(key K) bool {
-	//s.m.Lock()
-	//defer s.m.Unlock()
+	s.m.Lock()
+	defer s.m.Unlock()
 
 	keyHash := s.hasher(key)
 

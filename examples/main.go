@@ -5,7 +5,6 @@ import (
 	"hash/fnv"
 
 	"github.com/birdayz/ezcache"
-	"github.com/davecgh/go-spew/spew"
 )
 
 type TestKey struct {
@@ -42,7 +41,4 @@ func main() {
 
 	res, err := a.Get(k)
 	fmt.Println("Got back", res, err)
-
-	spew.Dump(a)
-
 }
