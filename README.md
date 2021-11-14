@@ -11,3 +11,10 @@
 - TTL
 - Work with binary data (for both in-mem and semi persistent storage); employ marshalers/unmarshalers
 - Consider using mmap for the storage
+
+
+TBD
+- []string is not comparable. would be nice to have it as allowed type.
+- Cache errors, when would you want to have this?
+- LoaderFn where previous value is known
+- What about ctx?

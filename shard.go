@@ -29,7 +29,7 @@ func (s *shard[K, V]) set(key K, value V) {
 	b.items[key] = value
 }
 
-func (s *shard[K, V]) get(key K) V {
+func (s *shard[K, V]) get(key K) (V, bool) {
 	s.m.RLock()
 	defer s.m.RUnlock()
 
@@ -37,11 +37,11 @@ func (s *shard[K, V]) get(key K) V {
 
 	if bucket, found := s.buckets[keyHash]; found {
 		if item, found := bucket.items[key]; found {
-			return item
+			return item, true
 		}
 	}
 
-	return *new(V)
+	return *new(V), false
 }
 
 func (s *shard[K, V]) delete(key K) bool {

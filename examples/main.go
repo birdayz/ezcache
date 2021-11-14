@@ -10,7 +10,6 @@ import (
 type TestKey struct {
 	blah int
 	bleh string
-	x    map[string]string
 }
 
 func (t TestKey) String() string {
@@ -20,9 +19,11 @@ func (t TestKey) String() string {
 func main() {
 	r := fmt.Sprintf("%v", TestKey{blah: 1, bleh: "x"})
 	fmt.Println(r)
+
 	a := ezcache.New(
-		func(key *TestKey) (string, error) {
-			return "value", nil
+		func(key *TestKey) (*[]string, error) {
+			x := []string{"value"}
+			return &x, nil
 		},
 		func(key *TestKey) uint64 {
 			h := fnv.New64a()
@@ -37,7 +38,7 @@ func main() {
 		bleh: "",
 	}
 
-	a.Set(k, "my-value")
+	a.Set(k, &[]string{"my-value"})
 
 	res, err := a.Get(k)
 	fmt.Println("Got back", res, err)

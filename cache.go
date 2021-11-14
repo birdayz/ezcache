@@ -2,6 +2,8 @@ package ezcache
 
 import (
 	"sync"
+
+	"github.com/pkg/errors"
 )
 
 func New[K comparable, V comparable](loader LoaderFn[K, V], hasher HasherFn[K], numShards int) *Cache[K, V] {
@@ -16,7 +18,6 @@ func New[K comparable, V comparable](loader LoaderFn[K, V], hasher HasherFn[K], 
 	}
 
 	return &Cache[K, V]{
-		m:        sync.Mutex{},
 		loaderFn: loader,
 		hasherFn: hasher,
 		shards:   shards,
@@ -24,16 +25,12 @@ func New[K comparable, V comparable](loader LoaderFn[K, V], hasher HasherFn[K], 
 }
 
 type LoaderFn[K comparable, V comparable] func(key K) (value V, err error)
-
 type HasherFn[K comparable] func(key K) uint64
 
 type Cache[K comparable, V comparable] struct {
-	m sync.Mutex
-
 	loaderFn LoaderFn[K, V]
 	hasherFn HasherFn[K]
-
-	shards []shard[K, V]
+	shards   []shard[K, V]
 }
 
 func (c *Cache[K, V]) getShard(hash uint64) *shard[K, V] {
@@ -41,9 +38,6 @@ func (c *Cache[K, V]) getShard(hash uint64) *shard[K, V] {
 }
 
 func (c *Cache[K, V]) Set(key K, value V) {
-	c.m.Lock()
-	defer c.m.Unlock()
-
 	keyHash := c.hasherFn(key)
 	shard := c.getShard(keyHash)
 
@@ -51,11 +45,26 @@ func (c *Cache[K, V]) Set(key K, value V) {
 }
 
 func (c *Cache[K, V]) Get(key K) (V, error) {
-	c.m.Lock()
-	defer c.m.Unlock()
-
 	keyHash := c.hasherFn(key)
 	shard := c.getShard(keyHash)
 
-	return shard.get(key), nil
+	result, found := shard.get(key)
+
+	if !found {
+		value, err := c.loaderFn(key)
+		if err != nil {
+			return value, errors.Wrap(err, "failed to run loader")
+		}
+
+		// Since we don't hold the lock between get and set, it might be that we shadow other concurrent loads&writes.
+		// It might be helpful to allow only one cache load per key concurrently, to avoid thundering herd etc.
+		shard.set(key, value)
+		return value, nil
+	}
+
+	return result, nil
+}
+
+// TODO
+func (c *Cache[K, V]) Delete(key K) {
 }
