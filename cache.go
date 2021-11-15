@@ -65,6 +65,9 @@ func (c *Cache[K, V]) Get(key K) (V, error) {
 	return result, nil
 }
 
-// TODO
 func (c *Cache[K, V]) Delete(key K) {
+	keyHash := c.hasherFn(key)
+	shard := c.getShard(keyHash)
+
+	shard.delete(key)
 }
