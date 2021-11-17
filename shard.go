@@ -2,7 +2,10 @@ package ezcache
 
 import "sync"
 
-type shard[K comparable, V comparable] struct {
+type shard[K interface {
+	Equals(K) bool
+	HashCode() int
+}, V comparable] struct {
 	m       sync.RWMutex
 	buckets map[uint64]bucket[K, V]
 
@@ -18,7 +21,7 @@ func (s *shard[K, V]) set(key K, value V) {
 	b, found := s.buckets[keyHash]
 	if !found {
 		newBucket := bucket[K, V]{
-			items: make(map[K]V),
+			items: make([]bucketItem[K, V], 0, 0),
 		}
 
 		s.buckets[keyHash] = newBucket
@@ -26,7 +29,18 @@ func (s *shard[K, V]) set(key K, value V) {
 
 	}
 
-	b.items[key] = value
+	// Try to find entry for key
+	for _, buckItem := range b.items {
+		if buckItem.key.Equals(key) {
+			buckItem.value = value
+			return
+		}
+	}
+
+	b.items = append(b.items, bucketItem[K, V]{
+		key:   key,
+		value: value,
+	})
 }
 
 func (s *shard[K, V]) get(key K) (V, bool) {
@@ -36,8 +50,10 @@ func (s *shard[K, V]) get(key K) (V, bool) {
 	keyHash := s.hasher(key)
 
 	if bucket, found := s.buckets[keyHash]; found {
-		if item, found := bucket.items[key]; found {
-			return item, true
+		for _, bucketItem := range bucket.items {
+			if bucketItem.key.Equals(key) {
+				return bucketItem.value, true
+			}
 		}
 	}
 
@@ -50,13 +66,14 @@ func (s *shard[K, V]) delete(key K) bool {
 
 	keyHash := s.hasher(key)
 
-	b, found := s.buckets[keyHash]
-	if found {
-		if _, found := b.items[key]; found {
-			delete(b.items, key)
-			return true
+	if bucket, found := s.buckets[keyHash]; found {
+		for i, bucketItem := range bucket.items {
+			if bucketItem.key.Equals(key) {
+				_ = i
+				//bucket.items[len(bucket.items)-1], bucket.items[i] = new(bucketItem[K, V]), bucket.items[len(bucket.items)-1]
+				return true
+			}
 		}
-
 	}
 
 	return false
@@ -64,6 +81,17 @@ func (s *shard[K, V]) delete(key K) bool {
 
 // bucket
 
-type bucket[K comparable, V comparable] struct {
-	items map[K]V
+type bucketItem[K interface {
+	Equals(K) bool
+	HashCode() int
+}, V comparable] struct {
+	key   K
+	value V
+}
+
+type bucket[K interface {
+	Equals(K) bool
+	HashCode() int
+}, V comparable] struct {
+	items []bucketItem[K, V]
 }

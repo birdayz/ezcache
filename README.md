@@ -13,8 +13,7 @@
 - Consider using mmap for the storage
 
 
-TBD
-- []string is not comparable. would be nice to have it as allowed type.
+## TBD
 - Cache errors, when would you want to have this?
 - LoaderFn where previous value is known
 - What about ctx?

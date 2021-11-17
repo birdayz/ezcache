@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"hash/fnv"
+	"reflect"
 
 	"github.com/birdayz/ezcache"
 )
@@ -14,6 +15,14 @@ type TestKey struct {
 
 func (t TestKey) String() string {
 	return t.bleh
+}
+
+func (t *TestKey) Equals(other *TestKey) bool {
+	return reflect.DeepEqual(t, other)
+}
+
+func (t *TestKey) HashCode() int {
+	return 0
 }
 
 func main() {

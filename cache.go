@@ -6,7 +6,10 @@ import (
 	"github.com/pkg/errors"
 )
 
-func New[K comparable, V comparable](loader LoaderFn[K, V], hasher HasherFn[K], numShards int) *Cache[K, V] {
+func New[K interface {
+	Equals(K) bool
+	HashCode() int
+}, V comparable](loader LoaderFn[K, V], hasher HasherFn[K], numShards int) *Cache[K, V] {
 	shards := make([]shard[K, V], 0, numShards)
 
 	for i := 0; i < numShards; i++ {
@@ -24,10 +27,16 @@ func New[K comparable, V comparable](loader LoaderFn[K, V], hasher HasherFn[K], 
 	}
 }
 
-type LoaderFn[K comparable, V comparable] func(key K) (value V, err error)
-type HasherFn[K comparable] func(key K) uint64
+type LoaderFn[K interface {
+	Equals(K) bool
+	HashCode() int
+}, V comparable] func(key K) (value V, err error)
+type HasherFn[K any] func(key K) uint64
 
-type Cache[K comparable, V comparable] struct {
+type Cache[K interface {
+	Equals(K) bool
+	HashCode() int
+}, V comparable] struct {
 	loaderFn LoaderFn[K, V]
 	hasherFn HasherFn[K]
 	shards   []shard[K, V]
