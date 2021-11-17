@@ -1,15 +1,16 @@
 package ezcache
 
 import (
+	"sync"
 	"testing"
 
 	"gotest.tools/v3/assert"
 )
 
 func TestGet(t *testing.T) {
-	shard := &shard[string, string]{
-		buckets: map[uint64]bucket[string, string]{},
-		hasher:  StringHasher,
+	shard := &shard[KeyString, string]{
+		m:       sync.RWMutex{},
+		buckets: map[uint64]*bucket[KeyString, string]{},
 	}
 
 	shard.set("abc", "def")
@@ -20,9 +21,9 @@ func TestGet(t *testing.T) {
 }
 
 func TestGetDoesNotExist(t *testing.T) {
-	shard := &shard[string, string]{
-		buckets: map[uint64]bucket[string, string]{},
-		hasher:  StringHasher,
+	shard := &shard[KeyString, string]{
+		m:       sync.RWMutex{},
+		buckets: map[uint64]*bucket[KeyString, string]{},
 	}
 
 	res, ok := shard.get("doesnotexist")
@@ -32,9 +33,9 @@ func TestGetDoesNotExist(t *testing.T) {
 }
 
 func TestDelete(t *testing.T) {
-	shard := &shard[string, string]{
-		buckets: map[uint64]bucket[string, string]{},
-		hasher:  StringHasher,
+	shard := &shard[KeyString, string]{
+		m:       sync.RWMutex{},
+		buckets: map[uint64]*bucket[KeyString, string]{},
 	}
 
 	shard.set("abc", "def")

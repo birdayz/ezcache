@@ -6,39 +6,36 @@ import (
 	"github.com/pkg/errors"
 )
 
+type HashCoder interface {
+	HashCode() uint64
+}
+
 func New[K interface {
+	HashCoder
 	Equals(K) bool
-	HashCode() int
-}, V comparable](loader LoaderFn[K, V], hasher HasherFn[K], numShards int) *Cache[K, V] {
+}, V comparable](loader LoaderFn[K, V], numShards int) *Cache[K, V] {
 	shards := make([]shard[K, V], 0, numShards)
 
 	for i := 0; i < numShards; i++ {
 		shards = append(shards, shard[K, V]{
 			m:       sync.RWMutex{},
-			buckets: make(map[uint64]bucket[K, V]),
-			hasher:  hasher,
+			buckets: make(map[uint64]*bucket[K, V]),
 		})
 	}
 
 	return &Cache[K, V]{
 		loaderFn: loader,
-		hasherFn: hasher,
 		shards:   shards,
 	}
 }
 
-type LoaderFn[K interface {
-	Equals(K) bool
-	HashCode() int
-}, V comparable] func(key K) (value V, err error)
-type HasherFn[K any] func(key K) uint64
+type LoaderFn[K any, V any] func(key K) (value V, err error)
 
 type Cache[K interface {
+	HashCoder
 	Equals(K) bool
-	HashCode() int
 }, V comparable] struct {
 	loaderFn LoaderFn[K, V]
-	hasherFn HasherFn[K]
 	shards   []shard[K, V]
 }
 
@@ -47,14 +44,14 @@ func (c *Cache[K, V]) getShard(hash uint64) *shard[K, V] {
 }
 
 func (c *Cache[K, V]) Set(key K, value V) {
-	keyHash := c.hasherFn(key)
+	keyHash := key.HashCode()
 	shard := c.getShard(keyHash)
 
 	shard.set(key, value)
 }
 
 func (c *Cache[K, V]) Get(key K) (V, error) {
-	keyHash := c.hasherFn(key)
+	keyHash := key.HashCode()
 	shard := c.getShard(keyHash)
 
 	result, found := shard.get(key)
@@ -75,7 +72,7 @@ func (c *Cache[K, V]) Get(key K) (V, error) {
 }
 
 func (c *Cache[K, V]) Delete(key K) {
-	keyHash := c.hasherFn(key)
+	keyHash := key.HashCode()
 	shard := c.getShard(keyHash)
 
 	shard.delete(key)

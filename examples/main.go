@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"hash/fnv"
 	"reflect"
 
 	"github.com/birdayz/ezcache"
@@ -21,23 +20,15 @@ func (t *TestKey) Equals(other *TestKey) bool {
 	return reflect.DeepEqual(t, other)
 }
 
-func (t *TestKey) HashCode() int {
-	return 0
+func (t *TestKey) HashCode() uint64 {
+	return uint64(0)
 }
 
 func main() {
-	r := fmt.Sprintf("%v", TestKey{blah: 1, bleh: "x"})
-	fmt.Println(r)
-
 	a := ezcache.New(
 		func(key *TestKey) (*[]string, error) {
 			x := []string{"value"}
 			return &x, nil
-		},
-		func(key *TestKey) uint64 {
-			h := fnv.New64a()
-			h.Write([]byte(key.bleh))
-			return h.Sum64()
 		},
 		2,
 	)
@@ -50,5 +41,5 @@ func main() {
 	a.Set(k, &[]string{"my-value"})
 
 	res, err := a.Get(k)
-	fmt.Println("Got back", res, err)
+	fmt.Println(res, err)
 }

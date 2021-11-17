@@ -1,22 +1,22 @@
 package ezcache
 
-import "sync"
+import (
+	"sync"
+)
 
 type shard[K interface {
 	Equals(K) bool
-	HashCode() int
+	HashCoder
 }, V comparable] struct {
 	m       sync.RWMutex
-	buckets map[uint64]bucket[K, V]
-
-	hasher HasherFn[K]
+	buckets map[uint64]*bucket[K, V]
 }
 
 func (s *shard[K, V]) set(key K, value V) {
 	s.m.Lock()
 	defer s.m.Unlock()
 
-	keyHash := s.hasher(key)
+	keyHash := key.HashCode()
 
 	b, found := s.buckets[keyHash]
 	if !found {
@@ -24,8 +24,8 @@ func (s *shard[K, V]) set(key K, value V) {
 			items: make([]bucketItem[K, V], 0, 0),
 		}
 
-		s.buckets[keyHash] = newBucket
-		b = newBucket
+		s.buckets[keyHash] = &newBucket
+		b = &newBucket
 
 	}
 
@@ -47,7 +47,7 @@ func (s *shard[K, V]) get(key K) (V, bool) {
 	s.m.RLock()
 	defer s.m.RUnlock()
 
-	keyHash := s.hasher(key)
+	keyHash := key.HashCode()
 
 	if bucket, found := s.buckets[keyHash]; found {
 		for _, bucketItem := range bucket.items {
@@ -64,13 +64,13 @@ func (s *shard[K, V]) delete(key K) bool {
 	s.m.Lock()
 	defer s.m.Unlock()
 
-	keyHash := s.hasher(key)
+	keyHash := key.HashCode()
 
 	if bucket, found := s.buckets[keyHash]; found {
-		for i, bucketItem := range bucket.items {
-			if bucketItem.key.Equals(key) {
-				_ = i
-				//bucket.items[len(bucket.items)-1], bucket.items[i] = new(bucketItem[K, V]), bucket.items[len(bucket.items)-1]
+		for i, bi := range bucket.items {
+			if bi.key.Equals(key) {
+				// Can probably be optimized
+				bucket.items = append(bucket.items[:i], bucket.items[i+1:]...)
 				return true
 			}
 		}
@@ -82,16 +82,16 @@ func (s *shard[K, V]) delete(key K) bool {
 // bucket
 
 type bucketItem[K interface {
+	HashCoder
 	Equals(K) bool
-	HashCode() int
 }, V comparable] struct {
 	key   K
 	value V
 }
 
 type bucket[K interface {
+	HashCoder
 	Equals(K) bool
-	HashCode() int
 }, V comparable] struct {
 	items []bucketItem[K, V]
 }

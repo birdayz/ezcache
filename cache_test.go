@@ -7,8 +7,18 @@ import (
 	"gotest.tools/v3/assert"
 )
 
+type KeyString string
+
+func (ks KeyString) Equals(s KeyString) bool {
+	return s == ks
+}
+
+func (ks KeyString) HashCode() uint64 {
+	return 0
+}
+
 func TestCacheLoaderLoads(t *testing.T) {
-	cache := New(func(key string) (string, error) { return "test-val", nil }, StringHasher, 10)
+	cache := New(func(key KeyString) (string, error) { return "test-val", nil }, 10)
 
 	res, err := cache.Get("my-key")
 	assert.NilError(t, err)
@@ -17,7 +27,7 @@ func TestCacheLoaderLoads(t *testing.T) {
 
 func TestCacheLoaderError(t *testing.T) {
 	loaderError := "could not connect to database"
-	cache := New(func(key string) (string, error) { return "", errors.New(loaderError) }, StringHasher, 10)
+	cache := New(func(key KeyString) (string, error) { return "", errors.New(loaderError) }, 10)
 
 	_, err := cache.Get("my-key")
 	assert.ErrorContains(t, err, loaderError)
@@ -25,7 +35,7 @@ func TestCacheLoaderError(t *testing.T) {
 
 func TestCacheDelete(t *testing.T) {
 
-	cache := New(func(key string) (string, error) { return "", errors.New("dont want to load") }, StringHasher, 10)
+	cache := New(func(key KeyString) (string, error) { return "", errors.New("dont want to load") }, 10)
 	cache.Set("key", "value")
 	res, err := cache.Get("key")
 	assert.NilError(t, err)
