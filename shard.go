@@ -3,7 +3,6 @@ package ezcache
 import (
 	"sync"
 
-	"github.com/davecgh/go-spew/spew"
 	"golang.org/x/exp/slices"
 )
 
@@ -36,7 +35,6 @@ func (s *shard[K, V]) set(key K, value V) {
 	for _, buckItem := range b.items {
 		if buckItem.key.Equals(key) {
 			buckItem.value = value
-			spew.Dump(s)
 			return
 		}
 	}
