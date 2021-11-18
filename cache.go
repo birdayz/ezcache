@@ -1,9 +1,8 @@
 package ezcache
 
 import (
+	"fmt"
 	"sync"
-
-	"github.com/pkg/errors"
 )
 
 type HashCoder interface {
@@ -59,7 +58,7 @@ func (c *Cache[K, V]) Get(key K) (V, error) {
 	if !found {
 		value, err := c.loaderFn(key)
 		if err != nil {
-			return *new(V), errors.Wrap(err, "failed to run loader")
+			return *new(V), fmt.Errorf("failed to run loader: %w", err)
 		}
 
 		// Since we don't hold the lock between get and set, it might be that we shadow other concurrent loads&writes.
