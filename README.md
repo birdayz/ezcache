@@ -13,6 +13,7 @@
 - Capacity
 - Work with binary data (for both in-mem and semi persistent storage); employ marshalers/unmarshalers
 - Consider using mmap for the storage
+- Security,Safety: There are no collisions, i.e. if you Set/Get a key, you will never get a different key's value back because (with low chance) some other key got the same hash. Not even with low odds - not at all. We consider this extremely important for multi-tenant systems, where even rare collisions can comprimise other user's data.
 
 
 ## TBD
