@@ -2,11 +2,10 @@ module github.com/birdayz/ezcache
 
 go 1.18
 
-require gotest.tools/v3 v3.0.3
-
 require (
-	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/google/go-cmp v0.5.6 // indirect
-	github.com/pkg/errors v0.8.1 // indirect
-	golang.org/x/exp v0.0.0-20211117214101-03df57b9a508 // indirect
+	github.com/pkg/errors v0.8.1
+	golang.org/x/exp v0.0.0-20211117214101-03df57b9a508
+	gotest.tools/v3 v3.0.3
 )
+
+require github.com/google/go-cmp v0.5.6 // indirect
