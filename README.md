@@ -1,5 +1,8 @@
 ## Goals
-- Cache Loader support
+- [x] Cache Loader support 
+- Capacity
+- TTL
+- [ ] Write through
 - Cache Loader with current entry (-> Multiple implementations for the cache loader possible)
 - Bulk Loader
 - TBD: Sync vs Async load. What would it mean?
@@ -8,7 +11,6 @@
 - Cache errors?
 - Metrics
 - Capacity
-- TTL
 - Work with binary data (for both in-mem and semi persistent storage); employ marshalers/unmarshalers
 - Consider using mmap for the storage
 

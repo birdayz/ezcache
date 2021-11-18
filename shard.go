@@ -2,6 +2,9 @@ package ezcache
 
 import (
 	"sync"
+
+	"github.com/davecgh/go-spew/spew"
+	"golang.org/x/exp/slices"
 )
 
 type shard[K interface {
@@ -21,7 +24,7 @@ func (s *shard[K, V]) set(key K, value V) {
 	b, found := s.buckets[keyHash]
 	if !found {
 		newBucket := bucket[K, V]{
-			items: make([]bucketItem[K, V], 0, 0),
+			items: make([]*bucketItem[K, V], 0, 1),
 		}
 
 		s.buckets[keyHash] = &newBucket
@@ -33,11 +36,12 @@ func (s *shard[K, V]) set(key K, value V) {
 	for _, buckItem := range b.items {
 		if buckItem.key.Equals(key) {
 			buckItem.value = value
+			spew.Dump(s)
 			return
 		}
 	}
 
-	b.items = append(b.items, bucketItem[K, V]{
+	b.items = append(b.items, &bucketItem[K, V]{
 		key:   key,
 		value: value,
 	})
@@ -70,7 +74,7 @@ func (s *shard[K, V]) delete(key K) bool {
 		for i, bi := range bucket.items {
 			if bi.key.Equals(key) {
 				// Can probably be optimized
-				bucket.items = append(bucket.items[:i], bucket.items[i+1:]...)
+				bucket.items = slices.Delete(bucket.items, i, i+1)
 				return true
 			}
 		}
@@ -93,5 +97,5 @@ type bucket[K interface {
 	HashCoder
 	Equals(K) bool
 }, V comparable] struct {
-	items []bucketItem[K, V]
+	items []*bucketItem[K, V]
 }

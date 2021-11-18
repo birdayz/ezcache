@@ -8,9 +8,9 @@ import (
 )
 
 func TestGet(t *testing.T) {
-	shard := &shard[KeyString, string]{
+	shard := &shard[StringKey, string]{
 		m:       sync.RWMutex{},
-		buckets: map[uint64]*bucket[KeyString, string]{},
+		buckets: map[uint64]*bucket[StringKey, string]{},
 	}
 
 	shard.set("abc", "def")
@@ -21,9 +21,9 @@ func TestGet(t *testing.T) {
 }
 
 func TestGetDoesNotExist(t *testing.T) {
-	shard := &shard[KeyString, string]{
+	shard := &shard[StringKey, string]{
 		m:       sync.RWMutex{},
-		buckets: map[uint64]*bucket[KeyString, string]{},
+		buckets: map[uint64]*bucket[StringKey, string]{},
 	}
 
 	res, ok := shard.get("doesnotexist")
@@ -33,9 +33,9 @@ func TestGetDoesNotExist(t *testing.T) {
 }
 
 func TestDelete(t *testing.T) {
-	shard := &shard[KeyString, string]{
+	shard := &shard[StringKey, string]{
 		m:       sync.RWMutex{},
-		buckets: map[uint64]*bucket[KeyString, string]{},
+		buckets: map[uint64]*bucket[StringKey, string]{},
 	}
 
 	shard.set("abc", "def")
