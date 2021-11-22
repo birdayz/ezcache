@@ -14,6 +14,7 @@ type shard[K interface {
 	buckets map[uint64]*bucket[K, V]
 }
 
+// set returns true if the value existed before
 func (s *shard[K, V]) set(key K, value V) {
 	s.m.Lock()
 	defer s.m.Unlock()
