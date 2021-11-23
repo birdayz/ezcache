@@ -6,6 +6,8 @@ import (
 	"sync"
 )
 
+var ErrNotFound = errors.New("not found")
+
 type HashCoder interface {
 	HashCode() uint64
 }
@@ -13,7 +15,7 @@ type HashCoder interface {
 func New[K interface {
 	HashCoder
 	Equals(K) bool
-}, V comparable](loader LoaderFn[K, V], numShards int) *Cache[K, V] {
+}, V comparable](loader LoaderFn[K, V], numShards int, capacity int) *Cache[K, V] {
 	shards := make([]shard[K, V], 0, numShards)
 
 	for i := 0; i < numShards; i++ {
@@ -27,7 +29,7 @@ func New[K interface {
 		loaderFn:   loader,
 		shards:     shards,
 		linkedList: NewList[K](),
-		capacity:   10,
+		capacity:   capacity,
 	}
 }
 
@@ -72,7 +74,7 @@ func (c *Cache[K, V]) Set(key K, value V) {
 
 	if listItem == nil {
 		// We wrote a new entry -> must be added to LRU
-		c.linkedList.PushBack(key)
+		c.linkedList.PushFront(key)
 
 		// TODO: first check LRU/list, or first set in shard?
 	} else {
@@ -92,6 +94,9 @@ func (c *Cache[K, V]) Get(key K) (V, error) {
 	result, found := shard.get(key)
 
 	if !found {
+		if c.loaderFn == nil {
+			return *new(V), ErrNotFound
+		}
 		value, err := c.loaderFn(key)
 		if err != nil {
 			return *new(V), fmt.Errorf("failed to run loader: %w", err)

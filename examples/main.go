@@ -32,6 +32,7 @@ func main() {
 			return &x, nil
 		},
 		2,
+		10,
 	)
 
 	k := &TestKey{
@@ -45,7 +46,7 @@ func main() {
 	fmt.Println(res, err)
 
 	{
-		b := ezcache.New(func(key ezcache.StringKey) (string, error) { return "dsad", errors.New("fail") }, 256)
+		b := ezcache.New(func(key ezcache.StringKey) (string, error) { return "dsad", errors.New("fail") }, 256, 10)
 
 		back, _ := b.Get("abc")
 		fmt.Println("Got back", back)
