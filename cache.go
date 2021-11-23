@@ -45,6 +45,8 @@ type Cache[K interface {
 	linkedList *List[K]
 
 	capacity int
+
+	m sync.Mutex
 }
 
 func (c *Cache[K, V]) getShard(hash uint64) *shard[K, V] {
@@ -52,6 +54,11 @@ func (c *Cache[K, V]) getShard(hash uint64) *shard[K, V] {
 }
 
 func (c *Cache[K, V]) Set(key K, value V) {
+	// TODO get rid of this lock - currently it's needed because of the
+	// linkedList not being thread-safe
+	c.m.Lock()
+	defer c.m.Unlock()
+
 	keyHash := key.HashCode()
 	shard := c.getShard(keyHash)
 
