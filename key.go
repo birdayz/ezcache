@@ -13,3 +13,13 @@ func (ks StringKey) HashCode() uint64 {
 	h.Write([]byte(ks))
 	return h.Sum64()
 }
+
+type IntKey int
+
+func (ik IntKey) Equals(s IntKey) bool {
+	return ik == s
+}
+
+func (ik IntKey) HashCode() uint64 {
+	return uint64(ik)
+}

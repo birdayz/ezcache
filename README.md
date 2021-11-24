@@ -24,3 +24,7 @@
 - Cache errors, when would you want to have this?
 - LoaderFn where previous value is known
 - What about ctx?
+
+## TODO
+- Use map to lookup entries in LRU linkedList, instead of O(n) find.
+- Remove global mutex from Set/Get, which is needed because linkedList is not thread-safe.

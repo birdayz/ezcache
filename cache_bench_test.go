@@ -2,10 +2,9 @@ package ezcache
 
 import (
 	"fmt"
+	"math/rand"
 	"sync"
 	"testing"
-
-	"github.com/thanhpk/randstr"
 )
 
 func BenchmarkSet(b *testing.B) {
@@ -74,15 +73,15 @@ func BenchmarkParallelSet(b *testing.B) {
 			itemsPerWorker := tt.itemsPerWorker
 			buckets := tt.buckets
 
-			cache := New[StringKey, StringKey](nil, buckets, 1000)
+			cache := New[IntKey, StringKey](nil, buckets, 1000)
 
-			data := make(map[int][]string) // one entry per worker
+			data := make(map[int][]int) // one entry per worker
 
 			for i := 0; i < parallelism; i++ {
-				data[i] = make([]string, 0, itemsPerWorker)
+				data[i] = make([]int, 0, itemsPerWorker)
 
 				for d := 0; d < itemsPerWorker; d++ {
-					data[i] = append(data[i], randstr.String(10))
+					data[i] = append(data[i], rand.Int())
 				}
 			}
 
@@ -98,7 +97,7 @@ func BenchmarkParallelSet(b *testing.B) {
 
 						workerItems := data[workerID]
 						for _, workerItem := range workerItems {
-							cache.Set(StringKey(workerItem), "value")
+							cache.Set(IntKey(workerItem), "value")
 						}
 
 						wg.Done()
