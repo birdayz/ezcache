@@ -12,6 +12,9 @@ type shard[K interface {
 }, V comparable] struct {
 	m       sync.RWMutex
 	buckets map[uint64]*bucket[K, V]
+
+	linkedList *List[K]
+	capacity   int
 }
 
 // set returns true if the value existed before
@@ -35,26 +38,50 @@ func (s *shard[K, V]) set(key K, value V) {
 	// Try to find entry for key
 	for _, buckItem := range b.items {
 		if buckItem.key.Equals(key) {
+
+			// Found, we can just replace
 			buckItem.value = value
+
+			// "Touch" it in LRU, set counts as "used"
+			s.linkedList.MoveToFront(buckItem.node)
 			return
 		}
 	}
 
+	// Key is not in here yet, we have to add it
+
+	// Check if we need to evict
+	if s.linkedList.Len() >= s.capacity {
+
+		keyToRemove := s.linkedList.Back()
+
+		// Remove item. delete also removed the LRU entry, no need to specifically
+		// do it here
+		s.delete(keyToRemove.Value)
+	}
+
+	newElement := s.linkedList.PushFront(key)
+
 	b.items = append(b.items, &bucketItem[K, V]{
 		key:   key,
 		value: value,
+		node:  newElement,
 	})
 }
 
 func (s *shard[K, V]) get(key K) (V, bool) {
-	s.m.RLock()
-	defer s.m.RUnlock()
+	s.m.Lock()
+	defer s.m.Unlock()
+
+	// TODO, try to use RLock - it's not simple, because this func actually does
+	// modify : the linkedList.
 
 	keyHash := key.HashCode()
 
 	if bucket, found := s.buckets[keyHash]; found {
 		for _, bucketItem := range bucket.items {
 			if bucketItem.key.Equals(key) {
+				s.linkedList.MoveToFront(bucketItem.node)
 				return bucketItem.value, true
 			}
 		}
@@ -63,15 +90,22 @@ func (s *shard[K, V]) get(key K) (V, bool) {
 	return *new(V), false
 }
 
-func (s *shard[K, V]) delete(key K) bool {
+func (s *shard[K, V]) Delete(key K) bool {
 	s.m.Lock()
 	defer s.m.Unlock()
 
+	return s.delete(key)
+}
+
+func (s *shard[K, V]) delete(key K) bool {
 	keyHash := key.HashCode()
 
 	if bucket, found := s.buckets[keyHash]; found {
 		for i, bi := range bucket.items {
 			if bi.key.Equals(key) {
+				// We actually have the key
+
+				s.linkedList.Remove(bi.node)
 				// Can probably be optimized
 				bucket.items = slices.Delete(bucket.items, i, i+1)
 				return true
@@ -90,6 +124,7 @@ type bucketItem[K interface {
 }, V comparable] struct {
 	key   K
 	value V
+	node  *Element[K]
 }
 
 type bucket[K interface {
