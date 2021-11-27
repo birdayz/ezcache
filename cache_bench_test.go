@@ -68,7 +68,7 @@ func BenchmarkParallelSet(b *testing.B) {
 
 	for _, tt := range table {
 
-		b.Run(fmt.Sprintf("Parallel-%v-Buckets-%v", tt.parallelism, tt.buckets), func(b *testing.B) {
+		b.Run(fmt.Sprintf("%v-Parallel-%v-Buckets-%v", tt.itemsPerWorker*tt.parallelism, tt.parallelism, tt.buckets), func(b *testing.B) {
 			parallelism := tt.parallelism
 			itemsPerWorker := tt.itemsPerWorker
 			buckets := tt.buckets
