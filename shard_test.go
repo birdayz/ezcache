@@ -87,8 +87,10 @@ func TestSetGetEvictOrder(t *testing.T) {
 
 func TestGetDoesNotExist(t *testing.T) {
 	shard := &shard[StringKey, string]{
-		m:       sync.RWMutex{},
-		buckets: map[uint64]*bucket[StringKey, string]{},
+		m:          sync.RWMutex{},
+		buckets:    map[uint64]*bucket[StringKey, string]{},
+		linkedList: NewList[StringKey](),
+		capacity:   10,
 	}
 
 	res, ok := shard.get("doesnotexist")
@@ -99,8 +101,10 @@ func TestGetDoesNotExist(t *testing.T) {
 
 func TestDelete(t *testing.T) {
 	shard := &shard[StringKey, string]{
-		m:       sync.RWMutex{},
-		buckets: map[uint64]*bucket[StringKey, string]{},
+		m:          sync.RWMutex{},
+		buckets:    map[uint64]*bucket[StringKey, string]{},
+		linkedList: NewList[StringKey](),
+		capacity:   10,
 	}
 
 	shard.set("abc", "def")

@@ -17,6 +17,19 @@ type shard[K interface {
 	capacity   int
 }
 
+func newShard[K interface {
+	Equals(K) bool
+	HashCoder
+}, V comparable](capacity int) *shard[K, V] {
+
+	return &shard[K, V]{
+		m:          sync.RWMutex{},
+		buckets:    map[uint64]*bucket[K, V]{},
+		linkedList: NewList[K](),
+		capacity:   capacity,
+	}
+}
+
 // set returns true if the value existed before
 func (s *shard[K, V]) set(key K, value V) {
 	s.m.Lock()
@@ -37,7 +50,7 @@ func (s *shard[K, V]) set(key K, value V) {
 
 	// Try to find entry for key
 	for _, buckItem := range b.items {
-		if buckItem.key.Equals(key) {
+		if buckItem.node.Value.Equals(key) {
 
 			// Found, we can just replace
 			buckItem.value = value
@@ -63,7 +76,6 @@ func (s *shard[K, V]) set(key K, value V) {
 	newElement := s.linkedList.PushFront(key)
 
 	b.items = append(b.items, &bucketItem[K, V]{
-		key:   key,
 		value: value,
 		node:  newElement,
 	})
@@ -80,7 +92,7 @@ func (s *shard[K, V]) get(key K) (V, bool) {
 
 	if bucket, found := s.buckets[keyHash]; found {
 		for _, bucketItem := range bucket.items {
-			if bucketItem.key.Equals(key) {
+			if bucketItem.node.Value.Equals(key) {
 				s.linkedList.MoveToFront(bucketItem.node)
 				return bucketItem.value, true
 			}
@@ -102,7 +114,7 @@ func (s *shard[K, V]) delete(key K) bool {
 
 	if bucket, found := s.buckets[keyHash]; found {
 		for i, bi := range bucket.items {
-			if bi.key.Equals(key) {
+			if bi.node.Value.Equals(key) {
 				// We actually have the key
 
 				s.linkedList.Remove(bi.node)
@@ -122,7 +134,6 @@ type bucketItem[K interface {
 	HashCoder
 	Equals(K) bool
 }, V comparable] struct {
-	key   K
 	value V
 	node  *Element[K]
 }

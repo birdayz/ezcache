@@ -20,16 +20,16 @@ func New[K interface {
 
 	for i := 0; i < numShards; i++ {
 		shards = append(shards, shard[K, V]{
-			m:       sync.RWMutex{},
-			buckets: make(map[uint64]*bucket[K, V]),
+			m:          sync.RWMutex{},
+			buckets:    make(map[uint64]*bucket[K, V]),
+			linkedList: NewList[K](),
+			capacity:   (capacity / numShards) + 1,
 		})
 	}
 
 	return &Cache[K, V]{
-		loaderFn:   loader,
-		shards:     shards,
-		linkedList: NewList[K](),
-		capacity:   capacity,
+		loaderFn: loader,
+		shards:   shards,
 	}
 }
 
@@ -41,12 +41,6 @@ type Cache[K interface {
 }, V comparable] struct {
 	loaderFn LoaderFn[K, V]
 	shards   []shard[K, V]
-
-	linkedList *List[K]
-
-	capacity int
-
-	m sync.Mutex
 }
 
 func (c *Cache[K, V]) getShard(hash uint64) *shard[K, V] {
@@ -54,44 +48,10 @@ func (c *Cache[K, V]) getShard(hash uint64) *shard[K, V] {
 }
 
 func (c *Cache[K, V]) Set(key K, value V) {
-	// TODO get rid of this lock - currently it's needed because of the
-	// linkedList not being thread-safe
-	c.m.Lock()
-	defer c.m.Unlock()
-
 	keyHash := key.HashCode()
 	shard := c.getShard(keyHash)
 
-	// Replace list.Find with more efficient mechanism, eg. map
-	listItem := c.linkedList.Find(key)
-	if listItem == nil && c.linkedList.Len() >= c.capacity {
-		// evict
-
-		keyToRemove := c.linkedList.Back()
-		shardForDel := c.getShard(keyToRemove.Value.HashCode())
-
-		// Delete data from shard
-		shardForDel.delete(keyToRemove.Value)
-
-		// Delete from linked list
-		c.linkedList.Remove(keyToRemove)
-	}
-
 	shard.set(key, value)
-
-	if listItem == nil {
-		// We wrote a new entry -> must be added to LRU
-		c.linkedList.PushFront(key)
-
-		// TODO: first check LRU/list, or first set in shard?
-	} else {
-		// We updated an entry -> bring it to front (counts as "used")
-		if listItem == nil {
-			panic("Did not find item..this must not happen")
-		}
-
-		c.linkedList.MoveToFront(listItem)
-	}
 }
 
 func (c *Cache[K, V]) Get(key K) (V, error) {
@@ -114,12 +74,6 @@ func (c *Cache[K, V]) Get(key K) (V, error) {
 		shard.set(key, value)
 		return value, nil
 	}
-
-	item := c.linkedList.Find(key)
-	if item == nil {
-		return *new(V), errors.New("internal error: did not find linked list entry")
-	}
-	c.linkedList.MoveToFront(item)
 
 	return result, nil
 }

@@ -8,17 +8,24 @@ import (
 )
 
 func BenchmarkSet(b *testing.B) {
-	cache := New[StringKey, StringKey](nil, 256, 1000)
-	b.RunParallel(func(p *testing.PB) {
-		for p.Next() {
-			cache.Set("abc", "val")
+	cache := New[IntKey, StringKey](nil, 10, 100)
+
+	b.ResetTimer()
+	b.Run("Set", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			cache.Set(IntKey(i), "")
+		}
+	})
+	b.Run("Get", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			cache.Get(IntKey(i))
 		}
 	})
 
 }
 
 func BenchmarkParallelSet(b *testing.B) {
-	table := []struct {
+	tests := []struct {
 		parallelism    int
 		itemsPerWorker int
 		buckets        int
@@ -58,15 +65,19 @@ func BenchmarkParallelSet(b *testing.B) {
 			itemsPerWorker: 10000,
 			buckets:        256,
 		},
-
 		{
 			parallelism:    100,
 			itemsPerWorker: 1000,
 			buckets:        256,
 		},
+		{
+			parallelism:    100,
+			itemsPerWorker: 100000,
+			buckets:        256,
+		},
 	}
 
-	for _, tt := range table {
+	for _, tt := range tests {
 
 		b.Run(fmt.Sprintf("%v-Parallel-%v-Buckets-%v", tt.itemsPerWorker*tt.parallelism, tt.parallelism, tt.buckets), func(b *testing.B) {
 			parallelism := tt.parallelism
