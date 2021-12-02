@@ -51,14 +51,14 @@ func (c *Cache[K, V]) Set(key K, value V) {
 	keyHash := key.HashCode()
 	shard := c.getShard(keyHash)
 
-	shard.set(key, value)
+	shard.set(key, keyHash, value)
 }
 
 func (c *Cache[K, V]) Get(key K) (V, error) {
 	keyHash := key.HashCode()
 	shard := c.getShard(keyHash)
 
-	result, found := shard.get(key)
+	result, found := shard.get(key, keyHash)
 
 	if !found {
 		if c.loaderFn == nil {
@@ -71,7 +71,7 @@ func (c *Cache[K, V]) Get(key K) (V, error) {
 
 		// Since we don't hold the lock between get and set, it might be that we shadow other concurrent loads&writes.
 		// It might be helpful to allow only one cache load per key concurrently, to avoid thundering herd etc.
-		shard.set(key, value)
+		shard.set(key, key.HashCode(), value)
 		return value, nil
 	}
 

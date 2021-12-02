@@ -31,16 +31,14 @@ func newShard[K interface {
 }
 
 // set returns true if the value existed before
-func (s *shard[K, V]) set(key K, value V) {
+func (s *shard[K, V]) set(key K, keyHash uint64, value V) {
 	s.m.Lock()
 	defer s.m.Unlock()
-
-	keyHash := key.HashCode()
 
 	b, found := s.buckets[keyHash]
 	if !found {
 		newBucket := bucket[K, V]{
-			items: make([]*bucketItem[K, V], 0, 1),
+			items: make([]*bucketItem[K, V], 0, 4),
 		}
 
 		s.buckets[keyHash] = &newBucket
@@ -81,14 +79,12 @@ func (s *shard[K, V]) set(key K, value V) {
 	})
 }
 
-func (s *shard[K, V]) get(key K) (V, bool) {
+func (s *shard[K, V]) get(key K, keyHash uint64) (V, bool) {
 	s.m.Lock()
 	defer s.m.Unlock()
 
 	// TODO, try to use RLock - it's not simple, because this func actually does
 	// modify : the linkedList.
-
-	keyHash := key.HashCode()
 
 	if bucket, found := s.buckets[keyHash]; found {
 		for _, bucketItem := range bucket.items {

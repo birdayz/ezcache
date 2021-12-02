@@ -1,6 +1,8 @@
 package ezcache
 
-import "hash/fnv"
+import (
+	"hash/fnv"
+)
 
 type StringKey string
 

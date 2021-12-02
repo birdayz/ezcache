@@ -3,11 +3,28 @@ package ezcache
 import (
 	"fmt"
 	"math/rand"
+	"strconv"
 	"sync"
 	"testing"
 )
 
-func BenchmarkSet(b *testing.B) {
+func BenchmarkSetString(b *testing.B) {
+	cache := New[StringKey, StringKey](nil, 10, 100)
+
+	b.ResetTimer()
+	b.Run("Set", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			cache.Set(StringKey(strconv.Itoa(i)), "")
+		}
+	})
+	b.Run("Get", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			cache.Get(StringKey(strconv.Itoa(i)))
+		}
+	})
+}
+
+func BenchmarkSetInt(b *testing.B) {
 	cache := New[IntKey, StringKey](nil, 10, 100)
 
 	b.ResetTimer()
@@ -21,7 +38,6 @@ func BenchmarkSet(b *testing.B) {
 			cache.Get(IntKey(i))
 		}
 	})
-
 }
 
 func BenchmarkParallelSet(b *testing.B) {
@@ -84,7 +100,7 @@ func BenchmarkParallelSet(b *testing.B) {
 			itemsPerWorker := tt.itemsPerWorker
 			buckets := tt.buckets
 
-			cache := New[IntKey, StringKey](nil, buckets, 1000)
+			cache := New[IntKey, StringKey](nil, buckets, 100)
 
 			data := make(map[int][]int) // one entry per worker
 
