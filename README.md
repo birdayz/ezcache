@@ -26,5 +26,7 @@
 - What about ctx?
 
 ## TODO
-- Use map to lookup entries in LRU linkedList, instead of O(n) find.
-- Remove global mutex from Set/Get, which is needed because linkedList is not thread-safe.
+- [x] Use map to lookup entries in LRU linkedList, instead of O(n) find.
+- [x] Remove global mutex from Set/Get, which is needed because linkedList is not thread-safe.
+- Implement TTL with min-heap.
+	

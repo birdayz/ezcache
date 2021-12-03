@@ -2,6 +2,7 @@ package ezcache
 
 import (
 	"sync"
+	"time"
 
 	"golang.org/x/exp/slices"
 )
@@ -15,6 +16,9 @@ type shard[K interface {
 
 	linkedList *List[K]
 	capacity   int
+	ttl        time.Duration
+
+	ttls *Heap[*bucketItem[K, V]]
 }
 
 func newShard[K interface {
@@ -27,6 +31,15 @@ func newShard[K interface {
 		buckets:    map[uint64]*bucket[K, V]{},
 		linkedList: NewList[K](),
 		capacity:   capacity,
+		ttls: NewHeap(func(t1, t2 *bucketItem[K, V]) int {
+			if t1.expireAfter.After(t2.expireAfter) {
+				return 1
+			} else if t1.expireAfter.Before(t2.expireAfter) {
+				return -1
+			}
+			return 0
+		}),
+		ttl: time.Second * 2, //TODO
 	}
 }
 
@@ -53,6 +66,9 @@ func (s *shard[K, V]) set(key K, keyHash uint64, value V) {
 			// Found, we can just replace
 			buckItem.value = value
 
+			// Update expireAfter, "touch ttl/expiration"
+			buckItem.expireAfter = time.Now().Add(s.ttl)
+
 			// "Touch" it in LRU, set counts as "used"
 			s.linkedList.MoveToFront(buckItem.node)
 			return
@@ -74,11 +90,13 @@ func (s *shard[K, V]) set(key K, keyHash uint64, value V) {
 	newElement := s.linkedList.PushFront(key)
 
 	b.items = append(b.items, &bucketItem[K, V]{
-		value: value,
-		node:  newElement,
+		value:       value,
+		node:        newElement,
+		expireAfter: time.Now().Add(s.ttl),
 	})
 }
 
+// Cache ttl: does a get extend retention?
 func (s *shard[K, V]) get(key K, keyHash uint64) (V, bool) {
 	s.m.Lock()
 	defer s.m.Unlock()
@@ -130,8 +148,9 @@ type bucketItem[K interface {
 	HashCoder
 	Equals(K) bool
 }, V comparable] struct {
-	value V
-	node  *Element[K]
+	value       V
+	node        *Element[K]
+	expireAfter time.Time
 }
 
 type bucket[K interface {

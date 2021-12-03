@@ -71,7 +71,7 @@ func (c *Cache[K, V]) Get(key K) (V, error) {
 
 		// Since we don't hold the lock between get and set, it might be that we shadow other concurrent loads&writes.
 		// It might be helpful to allow only one cache load per key concurrently, to avoid thundering herd etc.
-		shard.set(key, key.HashCode(), value)
+		shard.set(key, keyHash, value)
 		return value, nil
 	}
 
