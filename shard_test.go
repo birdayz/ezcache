@@ -1,20 +1,14 @@
 package ezcache
 
 import (
-	"sync"
 	"testing"
+	"time"
 
 	"gotest.tools/v3/assert"
 )
 
 func TestGet(t *testing.T) {
-	shard := &shard[StringKey, string]{
-		m:          sync.RWMutex{},
-		buckets:    map[uint64]*bucket[StringKey, string]{},
-		linkedList: NewList[StringKey](),
-		capacity:   10,
-	}
-
+	shard := newShard[StringKey, string](10)
 	abc := StringKey("abc")
 
 	shard.set("abc", abc.HashCode(), "def")
@@ -25,13 +19,7 @@ func TestGet(t *testing.T) {
 }
 
 func TestSetGetEvict(t *testing.T) {
-	shard := &shard[StringKey, string]{
-		m:          sync.RWMutex{},
-		buckets:    map[uint64]*bucket[StringKey, string]{},
-		linkedList: NewList[StringKey](),
-		capacity:   2,
-	}
-
+	shard := newShard[StringKey, string](2)
 	first := StringKey("first")
 
 	shard.set("first", first.HashCode(), "def")
@@ -57,12 +45,7 @@ func TestSetGetEvict(t *testing.T) {
 }
 
 func TestSetGetEvictOrder(t *testing.T) {
-	shard := &shard[StringKey, string]{
-		m:          sync.RWMutex{},
-		buckets:    map[uint64]*bucket[StringKey, string]{},
-		linkedList: NewList[StringKey](),
-		capacity:   2,
-	}
+	shard := newShard[StringKey, string](2)
 
 	first := StringKey("first")
 	shard.set("first", first.HashCode(), "def")
@@ -95,12 +78,7 @@ func TestSetGetEvictOrder(t *testing.T) {
 }
 
 func TestGetDoesNotExist(t *testing.T) {
-	shard := &shard[StringKey, string]{
-		m:          sync.RWMutex{},
-		buckets:    map[uint64]*bucket[StringKey, string]{},
-		linkedList: NewList[StringKey](),
-		capacity:   10,
-	}
+	shard := newShard[StringKey, string](10)
 
 	doesnotexist := StringKey("doesnotexist")
 	res, ok := shard.get("doesnotexist", doesnotexist.HashCode())
@@ -110,12 +88,7 @@ func TestGetDoesNotExist(t *testing.T) {
 }
 
 func TestDelete(t *testing.T) {
-	shard := &shard[StringKey, string]{
-		m:          sync.RWMutex{},
-		buckets:    map[uint64]*bucket[StringKey, string]{},
-		linkedList: NewList[StringKey](),
-		capacity:   10,
-	}
+	shard := newShard[StringKey, string](10)
 
 	abc := StringKey("abc")
 	shard.set("abc", abc.HashCode(), "def")
@@ -130,4 +103,43 @@ func TestDelete(t *testing.T) {
 
 	// We expect the zero-value of the key type to be returned
 	assert.Equal(t, res, "")
+}
+
+func TestExpireTTL(t *testing.T) {
+	shard := newShard[StringKey, string](10)
+	shard.ttl = time.Millisecond * 10
+
+	abc := StringKey("abc")
+	shard.set("abc", abc.HashCode(), "def")
+
+	time.Sleep(time.Millisecond * 21)
+
+	_, ok := shard.get("abc", abc.HashCode())
+	assert.Equal(t, ok, false)
+
+}
+
+func TestExpireTTLProlongedAfterSet(t *testing.T) {
+	shard := newShard[StringKey, string](10)
+	shard.ttl = time.Millisecond * 10
+
+	abc := StringKey("abc")
+	def := StringKey("def")
+	shard.set("abc", abc.HashCode(), "def")
+	shard.set(def, def.HashCode(), "def2")
+
+	time.Sleep(time.Millisecond * 5) // TODO, replace timing based tests with mocked/mock-able clock
+	_, ok := shard.get("abc", abc.HashCode())
+	assert.Equal(t, ok, true)
+
+	shard.set("abc", abc.HashCode(), "defNew")
+	time.Sleep(time.Millisecond * 5) // TODO, replace timing based tests with mocked/mock-able clock
+
+	// Check if the first item, which was touched, is still around
+	_, ok = shard.get("abc", abc.HashCode())
+	assert.Equal(t, ok, true)
+
+	// Check if the second item, which we did not touch, was remove successfully
+	_, ok = shard.get(def, def.HashCode())
+	assert.Equal(t, ok, false)
 }

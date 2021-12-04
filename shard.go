@@ -47,6 +47,7 @@ func newShard[K interface {
 func (s *shard[K, V]) set(key K, keyHash uint64, value V) {
 	s.m.Lock()
 	defer s.m.Unlock()
+	s.clean()
 
 	b, found := s.buckets[keyHash]
 	if !found {
@@ -69,6 +70,13 @@ func (s *shard[K, V]) set(key K, keyHash uint64, value V) {
 			// Update expireAfter, "touch ttl/expiration"
 			buckItem.expireAfter = time.Now().Add(s.ttl)
 
+			// The logic here is based on the ordering in the min-heap: we have
+			// guaranteed ascending timestamp order. so we stop after seeing a
+			// timestamp that's in the future. Without calling Fix, the now-increased
+			// timestamp will stay at its location in the heap, which might be much
+			// further in the front, and clean would stop when finding it.
+			s.ttls.Fix(buckItem.heapElement)
+
 			// "Touch" it in LRU, set counts as "used"
 			s.linkedList.MoveToFront(buckItem.node)
 			return
@@ -89,17 +97,42 @@ func (s *shard[K, V]) set(key K, keyHash uint64, value V) {
 
 	newElement := s.linkedList.PushFront(key)
 
-	b.items = append(b.items, &bucketItem[K, V]{
+	bi := &bucketItem[K, V]{
 		value:       value,
 		node:        newElement,
 		expireAfter: time.Now().Add(s.ttl),
-	})
+	}
+
+	newHeapItem := s.ttls.Push(bi)
+	bi.heapElement = newHeapItem
+	b.items = append(b.items, bi)
+}
+
+func (s *shard[K, V]) clean() {
+	for {
+		if len(s.ttls.data) == 0 {
+			return
+		}
+
+		item := s.ttls.Peek()
+		if item.Item.expireAfter.Before(time.Now()) {
+			// remove item
+			res := s.delete(item.Item.node.Value)
+			if !res {
+				panic("bug - delete was unsuccessful. This means that fundamental invariants are broken, and the cache's internal state is most likely not consistent anymore")
+			}
+		} else {
+			return
+		}
+	}
 }
 
 // Cache ttl: does a get extend retention?
 func (s *shard[K, V]) get(key K, keyHash uint64) (V, bool) {
 	s.m.Lock()
 	defer s.m.Unlock()
+
+	s.clean()
 
 	// TODO, try to use RLock - it's not simple, because this func actually does
 	// modify : the linkedList.
@@ -134,11 +167,12 @@ func (s *shard[K, V]) delete(key K) bool {
 				s.linkedList.Remove(bi.node)
 				// Can probably be optimized
 				bucket.items = slices.Delete(bucket.items, i, i+1)
+				s.ttls.Remove(bi.heapElement)
+
 				return true
 			}
 		}
 	}
-
 	return false
 }
 
@@ -151,6 +185,9 @@ type bucketItem[K interface {
 	value       V
 	node        *Element[K]
 	expireAfter time.Time
+
+	// Pointer to heap item
+	heapElement *HeapElement[*bucketItem[K, V]]
 }
 
 type bucket[K interface {

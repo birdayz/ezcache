@@ -3,7 +3,6 @@ package ezcache
 import (
 	"errors"
 	"fmt"
-	"sync"
 )
 
 var ErrNotFound = errors.New("not found")
@@ -16,15 +15,11 @@ func New[K interface {
 	HashCoder
 	Equals(K) bool
 }, V comparable](loader LoaderFn[K, V], numShards int, capacity int) *Cache[K, V] {
-	shards := make([]shard[K, V], 0, numShards)
+	shards := make([]*shard[K, V], 0, numShards)
 
 	for i := 0; i < numShards; i++ {
-		shards = append(shards, shard[K, V]{
-			m:          sync.RWMutex{},
-			buckets:    make(map[uint64]*bucket[K, V]),
-			linkedList: NewList[K](),
-			capacity:   (capacity / numShards) + 1,
-		})
+		newShard := newShard[K, V]((capacity / numShards) + 1)
+		shards = append(shards, newShard)
 	}
 
 	return &Cache[K, V]{
@@ -33,18 +28,21 @@ func New[K interface {
 	}
 }
 
-type LoaderFn[K any, V any] func(key K) (value V, err error)
+type LoaderFn[K interface {
+	HashCoder
+	Equals(K) bool
+}, V any] func(key K) (value V, err error)
 
 type Cache[K interface {
 	HashCoder
 	Equals(K) bool
 }, V comparable] struct {
 	loaderFn LoaderFn[K, V]
-	shards   []shard[K, V]
+	shards   []*shard[K, V]
 }
 
 func (c *Cache[K, V]) getShard(hash uint64) *shard[K, V] {
-	return &c.shards[hash%(uint64(len(c.shards)))]
+	return c.shards[hash%(uint64(len(c.shards)))]
 }
 
 func (c *Cache[K, V]) Set(key K, value V) {

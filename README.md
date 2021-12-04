@@ -1,7 +1,7 @@
 ## Goals
 - [x] Cache Loader support 
-- Capacity
-- TTL
+- [x] Capacity
+- [x] TTL
 - [ ] Write through
 - Cache Loader with current entry (-> Multiple implementations for the cache loader possible)
 - Bulk Loader
@@ -24,9 +24,3 @@
 - Cache errors, when would you want to have this?
 - LoaderFn where previous value is known
 - What about ctx?
-
-## TODO
-- [x] Use map to lookup entries in LRU linkedList, instead of O(n) find.
-- [x] Remove global mutex from Set/Get, which is needed because linkedList is not thread-safe.
-- Implement TTL with min-heap.
-	
