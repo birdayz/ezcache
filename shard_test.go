@@ -109,12 +109,23 @@ func TestExpireTTL(t *testing.T) {
 	shard := newShard[StringKey, string](10)
 	shard.ttl = time.Millisecond * 10
 
+	var fakeTime time.Time
+
+	// "Inject" fake time
+	timeFn := func() time.Time {
+		return fakeTime
+	}
+	timeNow = timeFn
+	defer func() { timeNow = time.Now }()
+
+	fakeTime = time.Now()
+
 	abc := StringKey("abc")
 	shard.set("abc", abc.HashCode(), "def")
 
-	time.Sleep(time.Millisecond * 21)
+	fakeTime = fakeTime.Add(time.Millisecond * 11)
 
-	_, ok := shard.get("abc", abc.HashCode())
+	_, ok := shard.get(abc, abc.HashCode())
 	assert.Equal(t, ok, false)
 
 }

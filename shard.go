@@ -7,6 +7,10 @@ import (
 	"golang.org/x/exp/slices"
 )
 
+var (
+	timeNow = time.Now
+)
+
 type shard[K interface {
 	Equals(K) bool
 	HashCoder
@@ -68,7 +72,7 @@ func (s *shard[K, V]) set(key K, keyHash uint64, value V) {
 			buckItem.value = value
 
 			// Update expireAfter, "touch ttl/expiration"
-			buckItem.expireAfter = time.Now().Add(s.ttl)
+			buckItem.expireAfter = timeNow().Add(s.ttl)
 
 			// The logic here is based on the ordering in the min-heap: we have
 			// guaranteed ascending timestamp order. so we stop after seeing a
@@ -100,7 +104,7 @@ func (s *shard[K, V]) set(key K, keyHash uint64, value V) {
 	bi := &bucketItem[K, V]{
 		value:       value,
 		node:        newElement,
-		expireAfter: time.Now().Add(s.ttl),
+		expireAfter: timeNow().Add(s.ttl),
 	}
 
 	newHeapItem := s.ttls.Push(bi)
@@ -115,7 +119,7 @@ func (s *shard[K, V]) clean() {
 		}
 
 		item := s.ttls.Peek()
-		if item.Item.expireAfter.Before(time.Now()) {
+		if item.Item.expireAfter.Before(timeNow()) {
 			// remove item
 			res := s.delete(item.Item.node.Value)
 			if !res {
