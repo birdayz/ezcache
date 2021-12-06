@@ -15,6 +15,13 @@
 - Sub-package for practical, ready to use modules that use the cache, i.e.: grpc caching middleware, etag based cache for http, ...
 - Eviction callbacks
 - Admission policy? (See TinyLFU paper)
+- Generic map mit equals + hashcode !
+- Generic singleflight
+- Equals() + HashCode() vs comparable + hashCode -> use equals ?!
+- Refactor shard.go to not use map, but use slice/array + linkedlist
+- Frequently used vs Recently; auto refresh top frequently used? frequently more realistic?
+- refresh only frequent, but not recent data?
+- bloomfilter
 
 
 ## TBD
