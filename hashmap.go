@@ -1,15 +1,21 @@
 package ezcache
 
+import (
+	"golang.org/x/exp/slices"
+)
+
+const loadFactor = 0.75
+
 type Key[K any] interface {
 	Equals(K) bool
 	HashCoder
 }
 
 type bucket[K Key[K], V any] struct {
-	slots []slot[K, V]
+	slots []entry[K, V]
 }
 
-type slot[K Key[K], V any] struct {
+type entry[K Key[K], V any] struct {
 	key   K
 	value V
 	hash  uint64
@@ -18,8 +24,7 @@ type slot[K Key[K], V any] struct {
 type HashMap[K Key[K], V any] struct {
 	buckets []bucket[K, V]
 
-	currentSize int
-
+	currentSize     int
 	currentCapacity int
 }
 
@@ -33,7 +38,6 @@ func NewHashMap[K Key[K], V any](initialCapacity int) *HashMap[K, V] {
 }
 
 func (h *HashMap[K, V]) maybeGrow() {
-	var loadFactor = 0.75
 	if h.currentSize >= int(float64(h.currentCapacity)*loadFactor) {
 		newBuckets := make([]bucket[K, V], h.currentCapacity*2)
 
@@ -53,19 +57,12 @@ func (h *HashMap[K, V]) maybeGrow() {
 
 }
 
-// insert inserts a new entry into the bucket
-func (h *HashMap[K, V]) insert(b *bucket[K, V], key K, value V, hash uint64) {
-	b.slots = append(b.slots, slot[K, V]{key, value, hash})
-
-	h.currentSize++
-}
-
 func (h *HashMap[K, V]) Set(key K, value V) bool {
 	h.maybeGrow()
+
 	hash := key.HashCode()
-
 	bucket := &h.buckets[hash%uint64(len(h.buckets))]
-
+	//
 	for i := range bucket.slots {
 		if bucket.slots[i].key.Equals(key) {
 			bucket.slots[i].value = value
@@ -73,7 +70,10 @@ func (h *HashMap[K, V]) Set(key K, value V) bool {
 		}
 	}
 
-	h.insert(bucket, key, value, hash)
+	bucket.slots = append(bucket.slots, entry[K, V]{key, value, hash})
+	// fmt.Println(len(bucket.slots), h.currentSize)
+
+	h.currentSize++
 
 	return false
 }
@@ -89,5 +89,20 @@ func (h *HashMap[K, V]) Get(key K) (value V, found bool) {
 		}
 	}
 
+	return *new(V), false
+}
+
+func (h *HashMap[K, V]) Delete(key K) (prev V, deleted bool) {
+	hash := key.HashCode()
+
+	bucket := &h.buckets[hash%uint64(len(h.buckets))]
+
+	for i := range bucket.slots {
+		if bucket.slots[i].key.Equals(key) {
+			oldVal := bucket.slots[i].value
+			bucket.slots = slices.Delete(bucket.slots, i, i+1)
+			return oldVal, true
+		}
+	}
 	return *new(V), false
 }

@@ -15,7 +15,7 @@ type shard[K interface {
 }, V comparable] struct {
 	m sync.RWMutex
 
-	buckets []bucketItem[K, V]
+	dataMap *HashMap[K, *bucketItem[K, V]]
 
 	linkedList *List[K]
 	capacity   int
@@ -31,10 +31,10 @@ func newShard[K interface {
 
 	return &shard[K, V]{
 		m:          sync.RWMutex{},
-		buckets:    make([]bucketItem[K, V], 100000),
+		dataMap:    NewHashMap[K, *bucketItem[K, V]](16),
 		linkedList: NewList[K](),
 		capacity:   capacity,
-		ttl:        time.Second * 2,
+		ttl:        time.Second * 50,
 		ttls: NewHeap(func(t1, t2 *bucketItem[K, V]) int {
 			if t1.expireAfter.After(t2.expireAfter) {
 				return 1
@@ -50,79 +50,38 @@ func newShard[K interface {
 func (s *shard[K, V]) set(key K, keyHash uint64, value V) {
 	s.m.Lock()
 	defer s.m.Unlock()
-	//s.clean()
+	s.clean()
 
-	idx := int(keyHash) % len(s.buckets)
-	if idx < 0 {
-		idx = idx * -1
-	}
+	entry, ok := s.dataMap.Get(key)
+	if !ok {
 
-	if !s.buckets[idx].filled {
+		if s.linkedList.Len() >= s.capacity {
+			keyToRemove := s.linkedList.Back()
+			s.delete(keyToRemove.Value)
+		}
+
+		// Not found
 		newElement := s.linkedList.PushFront(key)
 
-		oldNext := s.buckets[idx].next
-
-		s.buckets[idx] = bucketItem[K, V]{
+		newItem := bucketItem[K, V]{
 			value:       value,
-			key:         key,
-			filled:      true,
 			expireAfter: timeNow().Add(s.ttl),
 			node:        newElement,
 			heapElement: nil,
-			next:        oldNext,
-			previous:    nil,
 		}
 
-		newHeapItem := s.ttls.Push(&s.buckets[idx])
-		s.buckets[idx].heapElement = newHeapItem
+		newHeapItem := s.ttls.Push(&newItem)
+		newItem.heapElement = newHeapItem
+		s.dataMap.Set(key, &newItem)
 
 		return
-	}
 
-	// Try to find existing entry
-	for pointer := &s.buckets[idx]; ; pointer = pointer.next {
-		if pointer.key.Equals(key) {
-
-			// Found, we can just replace
-			pointer.value = value
-
-			// Update expireAfter, "touch ttl/expiration"
-			pointer.expireAfter = timeNow().Add(s.ttl)
-
-			// The logic here is based on the ordering in the min-heap: we have
-			// guaranteed ascending timestamp order. so we stop after seeing a
-			// timestamp that's in the future. Without calling Fix, the now-increased
-			// timestamp will stay at its location in the heap, which might be much
-			// further in the front, and clean would stop when finding it.
-			s.ttls.Fix(pointer.heapElement)
-
-			// "Touch" it in LRU, set counts as "used"
-			s.linkedList.MoveToFront(pointer.node)
-			return
-		}
-
-		if pointer.next == nil {
-
-			newElement := s.linkedList.PushFront(key)
-			newItem := &bucketItem[K, V]{
-				value:       value,
-				key:         key,
-				filled:      true,
-				expireAfter: timeNow().Add(s.ttl),
-				node:        newElement,
-				heapElement: nil,
-				next:        nil,
-				previous:    nil,
-			}
-			newHeapItem := s.ttls.Push(newItem)
-			newItem.heapElement = newHeapItem
-
-			pointer.next = newItem
-			return
-
-		}
-		// TODO, eviction not impl.
-
+	} else {
+		entry.expireAfter = timeNow().Add(s.ttl) // TODO: store ttls somewhere else, not in the map entry
+		entry.value = value
+		s.ttls.Fix(entry.heapElement)
+		s.linkedList.MoveToFront(entry.node)
+		s.dataMap.Set(key, entry)
 	}
 }
 
@@ -135,7 +94,7 @@ func (s *shard[K, V]) clean() {
 		item := s.ttls.Peek()
 		if item.Item.expireAfter.Before(timeNow()) {
 			// remove item
-			res := s.delete(item.Item.key)
+			res := s.delete(item.Item.node.Value)
 			if !res {
 				panic("bug - delete was unsuccessful. This means that fundamental invariants are broken, and the cache's internal state is most likely not consistent anymore")
 			}
@@ -145,30 +104,23 @@ func (s *shard[K, V]) clean() {
 	}
 }
 
-// Cache ttl: does a get extend retention?
 func (s *shard[K, V]) get(key K, keyHash uint64) (V, bool) {
 	s.m.Lock()
 	defer s.m.Unlock()
 
-	//s.clean()
+	s.clean()
 
-	idx := int(keyHash) % len(s.buckets)
-	if idx < 0 {
-		idx = idx * -1
+	data, ok := s.dataMap.Get(key)
+	if !ok {
+		return *new(V), false
 	}
 
-	for pointer := &s.buckets[idx]; pointer != nil; pointer = pointer.next {
-		if pointer.key.Equals(key) && pointer.filled {
-			s.linkedList.MoveToFront(pointer.node)
-			return pointer.value, true
-		}
-	}
+	s.linkedList.MoveToFront(data.node)
+	return data.value, true
 
-	return *new(V), false
 }
 
 func (s *shard[K, V]) Delete(key K) bool {
-	panic("BIG DEL")
 	s.m.Lock()
 	defer s.m.Unlock()
 
@@ -176,50 +128,14 @@ func (s *shard[K, V]) Delete(key K) bool {
 }
 
 func (s *shard[K, V]) delete(key K) bool {
-	keyHash := key.HashCode()
-	idx := int(keyHash) % len(s.buckets)
-	if idx < 0 {
-		idx = idx * -1
+	oldVal, deleted := s.dataMap.Delete(key)
+
+	if deleted {
+		s.linkedList.Remove(oldVal.node)
+		s.ttls.Remove(oldVal.heapElement)
+		return true
 	}
 
-	if !s.buckets[idx].filled && s.buckets[idx].next == nil {
-		return false
-	}
-
-	for pointer := &s.buckets[idx]; pointer != nil; pointer = pointer.next {
-		if pointer.key.Equals(key) {
-			pointer.filled = false
-			if pointer.previous != nil {
-				pointer.previous.next = nil
-			}
-
-			if pointer.next != nil {
-				pointer.next.previous = pointer.previous
-			}
-
-			s.linkedList.Remove(pointer.node)
-			s.ttls.Remove(pointer.heapElement)
-
-			return true
-
-		}
-	}
-
-	// if s.buckets[idx].filled {
-	// 	//for i, bi := range bucket.items {
-	// 	if s.buckets[idx].key.Equals(key) {
-	// 		// We actually have the key
-	//
-	// 		s.linkedList.Remove(s.buckets[idx].node)
-	// 		// Can probably be optimized
-	// 		//bucket.items = slices.Delete(bucket.items, i, i+1)
-	// 		s.buckets[idx].filled = false
-	// 		s.ttls.Remove(s.buckets[idx].heapElement)
-	//
-	// 		return true
-	// 	}
-	// 	//}
-	// }
 	return false
 }
 
@@ -230,9 +146,6 @@ type bucketItem[K interface {
 	Equals(K) bool
 }, V comparable] struct {
 	value V
-	key   K
-
-	filled bool
 
 	expireAfter time.Time
 
@@ -241,8 +154,4 @@ type bucketItem[K interface {
 
 	// Pointer to heap item, used for TTL
 	heapElement *HeapElement[*bucketItem[K, V]]
-
-	// Pointers to next/prev items in bucket
-	next     *bucketItem[K, V]
-	previous *bucketItem[K, V]
 }

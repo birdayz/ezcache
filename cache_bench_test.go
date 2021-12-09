@@ -9,33 +9,59 @@ import (
 )
 
 func BenchmarkSetString(b *testing.B) {
-	cache := New[StringKey, StringKey](nil, 10, 10000000)
 
 	b.ResetTimer()
 	b.Run("Set", func(b *testing.B) {
+		cache := New[StringKey, string](nil, 10, 10000000)
+		b.ResetTimer()
+
 		for i := 0; i < b.N; i++ {
 			cache.Set(StringKey(strconv.Itoa(i)), "")
 		}
 	})
 	b.Run("Get", func(b *testing.B) {
+		cache := New[StringKey, string](nil, 10, 10000000)
+
 		for i := 0; i < b.N; i++ {
-			cache.Get(StringKey(strconv.Itoa(i)))
+			cache.Set(StringKey(strconv.Itoa(i)), strconv.Itoa(i))
+		}
+
+		for i := 0; i < b.N; i++ {
+			res, _ := cache.Get(StringKey(strconv.Itoa(i)))
+			if res != strconv.Itoa(i) {
+				b.FailNow()
+			}
 		}
 	})
 }
 
 func BenchmarkSetInt(b *testing.B) {
-	cache := New[IntKey, StringKey](nil, 10, 10000000)
 
 	b.ResetTimer()
 	b.Run("Set", func(b *testing.B) {
+		cache := New[IntKey, int](nil, 10, 10000000)
+		b.ResetTimer()
+
 		for i := 0; i < b.N; i++ {
-			cache.Set(IntKey(i), "")
+			cache.Set(IntKey(i), i)
 		}
 	})
 	b.Run("Get", func(b *testing.B) {
+		cache := New[IntKey, int](nil, 10, 10000000)
 		for i := 0; i < b.N; i++ {
-			cache.Get(IntKey(i))
+			cache.Set(IntKey(i), i)
+		}
+
+		b.ResetTimer()
+
+		for i := 0; i < b.N; i++ {
+			res, err := cache.Get(IntKey(i))
+			if err != nil {
+				b.FailNow()
+			}
+			if res != i {
+				b.FailNow()
+			}
 		}
 	})
 }

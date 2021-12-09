@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"gotest.tools/v3/assert"
 )
 
@@ -19,7 +20,6 @@ func TestGet(t *testing.T) {
 }
 
 func TestSetGetEvict(t *testing.T) {
-	t.Skip()
 	shard := newShard[StringKey, string](2)
 	first := StringKey("first")
 
@@ -41,12 +41,12 @@ func TestSetGetEvict(t *testing.T) {
 	assert.Equal(t, ok, true)
 	assert.Equal(t, res, "third_val", third.HashCode())
 
+	spew.Dump(shard)
 	res, ok = shard.get("first", first.HashCode())
 	assert.Equal(t, ok, false)
 }
 
 func TestSetGetEvictOrder(t *testing.T) {
-	t.Skip()
 	shard := newShard[StringKey, string](2)
 
 	first := StringKey("first")

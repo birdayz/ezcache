@@ -7,6 +7,22 @@ import (
 	"gotest.tools/v3/assert"
 )
 
+func TestSetGetInt(t *testing.T) {
+	cache := New[IntKey, int](nil, 10, 10)
+	cache.Set(0, 0)
+	cache.Set(1, 1)
+	cache.Set(2, 2)
+
+	r, err := cache.Get(1)
+	assert.NilError(t, err)
+	assert.Equal(t, r, 1)
+
+	r, err = cache.Get(2)
+	assert.NilError(t, err)
+	assert.Equal(t, r, 2)
+
+}
+
 func TestCacheLoaderLoads(t *testing.T) {
 	cache := New(func(key StringKey) (string, error) { return "test-val", nil }, 10, 10)
 
@@ -31,6 +47,7 @@ func TestCacheDelete(t *testing.T) {
 	assert.Equal(t, res, "value")
 	cache.Delete("key")
 	res, err = cache.Get("key")
+	assert.Equal(t, res, "")
 	assert.ErrorContains(t, err, "dont want to")
 }
 
@@ -42,41 +59,4 @@ func TestCacheSetSet(t *testing.T) {
 	assert.NilError(t, err)
 	assert.Equal(t, res, "value2")
 
-}
-
-func TestExpire(t *testing.T) {
-	t.Skip("Expire test is obsolete atm because of sharding, some other shard will have some space..")
-	cache := New[StringKey, StringKey](nil, 10, 2)
-
-	cache.Set("key1", "val1")
-	cache.Set("key2", "val2")
-	cache.Set("key3", "val3")
-
-	res, err := cache.Get("key1")
-	assert.Error(t, err, ErrNotFound.Error())
-	assert.Equal(t, res, StringKey(""))
-}
-
-func TestExpireOrder(t *testing.T) {
-	t.Skip("Expire test is obsolete atm because of sharding, some other shard will have some space..")
-	cache := New[StringKey, StringKey](nil, 10, 2)
-
-	cache.Set("key1", "val1")
-	cache.Set("key2", "val2")
-	cache.Set("key3", "val3")
-	cache.Set("key4", "val4")
-
-	_, err := cache.Get("key1")
-	assert.Error(t, err, ErrNotFound.Error())
-
-	_, err = cache.Get("key2")
-	assert.Error(t, err, ErrNotFound.Error())
-
-	res, err := cache.Get("key3")
-	assert.NilError(t, err)
-	assert.Equal(t, res, StringKey("val3"))
-
-	res, err = cache.Get("key4")
-	assert.NilError(t, err)
-	assert.Equal(t, res, StringKey("val4"))
 }

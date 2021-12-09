@@ -36,11 +36,3 @@ func TestHeap(t *testing.T) {
 	assert.Equal(t, res.Item, 100)
 
 }
-
-func TestHeapEmpty(t *testing.T) {
-	t.Skip()
-	h := NewHeap(AscendingComparator[int])
-
-	h.Peek()
-	h.Pop()
-}

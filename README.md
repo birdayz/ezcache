@@ -28,3 +28,4 @@
 - Cache errors, when would you want to have this?
 - LoaderFn where previous value is known
 - What about ctx?
+- Reduce number of hash func calls
