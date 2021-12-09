@@ -3,8 +3,6 @@ package ezcache
 import (
 	"sync"
 	"time"
-
-	"golang.org/x/exp/slices"
 )
 
 var (
@@ -15,8 +13,9 @@ type shard[K interface {
 	Equals(K) bool
 	HashCoder
 }, V comparable] struct {
-	m       sync.RWMutex
-	buckets map[uint64]*bucket[K, V]
+	m sync.RWMutex
+
+	buckets []bucketItem[K, V]
 
 	linkedList *List[K]
 	capacity   int
@@ -32,9 +31,10 @@ func newShard[K interface {
 
 	return &shard[K, V]{
 		m:          sync.RWMutex{},
-		buckets:    map[uint64]*bucket[K, V]{},
+		buckets:    make([]bucketItem[K, V], 100000),
 		linkedList: NewList[K](),
 		capacity:   capacity,
+		ttl:        time.Second * 2,
 		ttls: NewHeap(func(t1, t2 *bucketItem[K, V]) int {
 			if t1.expireAfter.After(t2.expireAfter) {
 				return 1
@@ -43,7 +43,6 @@ func newShard[K interface {
 			}
 			return 0
 		}),
-		ttl: time.Second * 2, //TODO
 	}
 }
 
@@ -51,65 +50,80 @@ func newShard[K interface {
 func (s *shard[K, V]) set(key K, keyHash uint64, value V) {
 	s.m.Lock()
 	defer s.m.Unlock()
-	s.clean()
+	//s.clean()
 
-	b, found := s.buckets[keyHash]
-	if !found {
-		newBucket := bucket[K, V]{
-			items: make([]*bucketItem[K, V], 0, 4),
-		}
-
-		s.buckets[keyHash] = &newBucket
-		b = &newBucket
-
+	idx := int(keyHash) % len(s.buckets)
+	if idx < 0 {
+		idx = idx * -1
 	}
 
-	// Try to find entry for key
-	for _, buckItem := range b.items {
-		if buckItem.node.Value.Equals(key) {
+	if !s.buckets[idx].filled {
+		newElement := s.linkedList.PushFront(key)
+
+		oldNext := s.buckets[idx].next
+
+		s.buckets[idx] = bucketItem[K, V]{
+			value:       value,
+			key:         key,
+			filled:      true,
+			expireAfter: timeNow().Add(s.ttl),
+			node:        newElement,
+			heapElement: nil,
+			next:        oldNext,
+			previous:    nil,
+		}
+
+		newHeapItem := s.ttls.Push(&s.buckets[idx])
+		s.buckets[idx].heapElement = newHeapItem
+
+		return
+	}
+
+	// Try to find existing entry
+	for pointer := &s.buckets[idx]; ; pointer = pointer.next {
+		if pointer.key.Equals(key) {
 
 			// Found, we can just replace
-			buckItem.value = value
+			pointer.value = value
 
 			// Update expireAfter, "touch ttl/expiration"
-			buckItem.expireAfter = timeNow().Add(s.ttl)
+			pointer.expireAfter = timeNow().Add(s.ttl)
 
 			// The logic here is based on the ordering in the min-heap: we have
 			// guaranteed ascending timestamp order. so we stop after seeing a
 			// timestamp that's in the future. Without calling Fix, the now-increased
 			// timestamp will stay at its location in the heap, which might be much
 			// further in the front, and clean would stop when finding it.
-			s.ttls.Fix(buckItem.heapElement)
+			s.ttls.Fix(pointer.heapElement)
 
 			// "Touch" it in LRU, set counts as "used"
-			s.linkedList.MoveToFront(buckItem.node)
+			s.linkedList.MoveToFront(pointer.node)
 			return
 		}
+
+		if pointer.next == nil {
+
+			newElement := s.linkedList.PushFront(key)
+			newItem := &bucketItem[K, V]{
+				value:       value,
+				key:         key,
+				filled:      true,
+				expireAfter: timeNow().Add(s.ttl),
+				node:        newElement,
+				heapElement: nil,
+				next:        nil,
+				previous:    nil,
+			}
+			newHeapItem := s.ttls.Push(newItem)
+			newItem.heapElement = newHeapItem
+
+			pointer.next = newItem
+			return
+
+		}
+		// TODO, eviction not impl.
+
 	}
-
-	// Key is not in here yet, we have to add it
-
-	// Check if we need to evict
-	if s.linkedList.Len() >= s.capacity {
-
-		keyToRemove := s.linkedList.Back()
-
-		// Remove item. delete also removed the LRU entry, no need to specifically
-		// do it here
-		s.delete(keyToRemove.Value)
-	}
-
-	newElement := s.linkedList.PushFront(key)
-
-	bi := &bucketItem[K, V]{
-		value:       value,
-		node:        newElement,
-		expireAfter: timeNow().Add(s.ttl),
-	}
-
-	newHeapItem := s.ttls.Push(bi)
-	bi.heapElement = newHeapItem
-	b.items = append(b.items, bi)
 }
 
 func (s *shard[K, V]) clean() {
@@ -121,7 +135,7 @@ func (s *shard[K, V]) clean() {
 		item := s.ttls.Peek()
 		if item.Item.expireAfter.Before(timeNow()) {
 			// remove item
-			res := s.delete(item.Item.node.Value)
+			res := s.delete(item.Item.key)
 			if !res {
 				panic("bug - delete was unsuccessful. This means that fundamental invariants are broken, and the cache's internal state is most likely not consistent anymore")
 			}
@@ -136,17 +150,17 @@ func (s *shard[K, V]) get(key K, keyHash uint64) (V, bool) {
 	s.m.Lock()
 	defer s.m.Unlock()
 
-	s.clean()
+	//s.clean()
 
-	// TODO, try to use RLock - it's not simple, because this func actually does
-	// modify : the linkedList.
+	idx := int(keyHash) % len(s.buckets)
+	if idx < 0 {
+		idx = idx * -1
+	}
 
-	if bucket, found := s.buckets[keyHash]; found {
-		for _, bucketItem := range bucket.items {
-			if bucketItem.node.Value.Equals(key) {
-				s.linkedList.MoveToFront(bucketItem.node)
-				return bucketItem.value, true
-			}
+	for pointer := &s.buckets[idx]; pointer != nil; pointer = pointer.next {
+		if pointer.key.Equals(key) && pointer.filled {
+			s.linkedList.MoveToFront(pointer.node)
+			return pointer.value, true
 		}
 	}
 
@@ -154,6 +168,7 @@ func (s *shard[K, V]) get(key K, keyHash uint64) (V, bool) {
 }
 
 func (s *shard[K, V]) Delete(key K) bool {
+	panic("BIG DEL")
 	s.m.Lock()
 	defer s.m.Unlock()
 
@@ -162,21 +177,49 @@ func (s *shard[K, V]) Delete(key K) bool {
 
 func (s *shard[K, V]) delete(key K) bool {
 	keyHash := key.HashCode()
+	idx := int(keyHash) % len(s.buckets)
+	if idx < 0 {
+		idx = idx * -1
+	}
 
-	if bucket, found := s.buckets[keyHash]; found {
-		for i, bi := range bucket.items {
-			if bi.node.Value.Equals(key) {
-				// We actually have the key
+	if !s.buckets[idx].filled && s.buckets[idx].next == nil {
+		return false
+	}
 
-				s.linkedList.Remove(bi.node)
-				// Can probably be optimized
-				bucket.items = slices.Delete(bucket.items, i, i+1)
-				s.ttls.Remove(bi.heapElement)
-
-				return true
+	for pointer := &s.buckets[idx]; pointer != nil; pointer = pointer.next {
+		if pointer.key.Equals(key) {
+			pointer.filled = false
+			if pointer.previous != nil {
+				pointer.previous.next = nil
 			}
+
+			if pointer.next != nil {
+				pointer.next.previous = pointer.previous
+			}
+
+			s.linkedList.Remove(pointer.node)
+			s.ttls.Remove(pointer.heapElement)
+
+			return true
+
 		}
 	}
+
+	// if s.buckets[idx].filled {
+	// 	//for i, bi := range bucket.items {
+	// 	if s.buckets[idx].key.Equals(key) {
+	// 		// We actually have the key
+	//
+	// 		s.linkedList.Remove(s.buckets[idx].node)
+	// 		// Can probably be optimized
+	// 		//bucket.items = slices.Delete(bucket.items, i, i+1)
+	// 		s.buckets[idx].filled = false
+	// 		s.ttls.Remove(s.buckets[idx].heapElement)
+	//
+	// 		return true
+	// 	}
+	// 	//}
+	// }
 	return false
 }
 
@@ -186,17 +229,20 @@ type bucketItem[K interface {
 	HashCoder
 	Equals(K) bool
 }, V comparable] struct {
-	value       V
-	node        *Element[K]
+	value V
+	key   K
+
+	filled bool
+
 	expireAfter time.Time
 
-	// Pointer to heap item
-	heapElement *HeapElement[*bucketItem[K, V]]
-}
+	// LinkedList node pointer, used for LRU eviction
+	node *Element[K]
 
-type bucket[K interface {
-	HashCoder
-	Equals(K) bool
-}, V comparable] struct {
-	items []*bucketItem[K, V]
+	// Pointer to heap item, used for TTL
+	heapElement *HeapElement[*bucketItem[K, V]]
+
+	// Pointers to next/prev items in bucket
+	next     *bucketItem[K, V]
+	previous *bucketItem[K, V]
 }

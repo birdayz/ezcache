@@ -9,7 +9,7 @@ import (
 )
 
 func BenchmarkSetString(b *testing.B) {
-	cache := New[StringKey, StringKey](nil, 10, 100)
+	cache := New[StringKey, StringKey](nil, 10, 10000000)
 
 	b.ResetTimer()
 	b.Run("Set", func(b *testing.B) {
@@ -25,7 +25,7 @@ func BenchmarkSetString(b *testing.B) {
 }
 
 func BenchmarkSetInt(b *testing.B) {
-	cache := New[IntKey, StringKey](nil, 10, 100)
+	cache := New[IntKey, StringKey](nil, 10, 10000000)
 
 	b.ResetTimer()
 	b.Run("Set", func(b *testing.B) {
@@ -100,7 +100,7 @@ func BenchmarkParallelSet(b *testing.B) {
 			itemsPerWorker := tt.itemsPerWorker
 			buckets := tt.buckets
 
-			cache := New[IntKey, StringKey](nil, buckets, 100)
+			cache := New[IntKey, StringKey](nil, buckets, 100000)
 
 			data := make(map[int][]int) // one entry per worker
 

@@ -55,7 +55,6 @@ func (c *Cache[K, V]) Set(key K, value V) {
 func (c *Cache[K, V]) Get(key K) (V, error) {
 	keyHash := key.HashCode()
 	shard := c.getShard(keyHash)
-
 	result, found := shard.get(key, keyHash)
 
 	if !found {
