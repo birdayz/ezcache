@@ -7,8 +7,7 @@ import (
 )
 
 func TestHashMapSet(t *testing.T) {
-
-	m := NewHashMap[StringKey, string]()
+	m := NewHashMap[StringKey, string](16)
 
 	m.Set("keya", "valuea")
 
@@ -22,4 +21,17 @@ func TestHashMapSet(t *testing.T) {
 	res, ok = m.Get("keya")
 	assert.Equal(t, ok, true)
 	assert.Equal(t, res, "valueb")
+}
+
+func TestHashMapSetWithGrow(t *testing.T) {
+	m := NewHashMap[IntKey, int](16)
+
+	for i := 0; i < 5000; i++ {
+		m.Set(IntKey(i), i)
+
+		res, ok := m.Get(IntKey(i))
+		assert.Equal(t, ok, true)
+		assert.Equal(t, res, i)
+	}
+
 }

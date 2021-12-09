@@ -1,68 +1,67 @@
 package ezcache
 
-import (
-	"fmt"
-
-	"golang.org/x/exp/slices"
-)
-
-type bucket[K interface {
-	HashCoder
+type Key[K any] interface {
 	Equals(K) bool
-}, V any] struct {
+	HashCoder
+}
+
+type bucket[K Key[K], V any] struct {
 	slots []slot[K, V]
 }
 
-type slot[K interface {
-	HashCoder
-	Equals(K) bool
-}, V any] struct {
+type slot[K Key[K], V any] struct {
 	key   K
 	value V
+	hash  uint64
 }
 
-type HashMap[K interface {
-	HashCoder
-	Equals(K) bool
-}, V any] struct {
+type HashMap[K Key[K], V any] struct {
 	buckets []bucket[K, V]
 
 	currentSize int
 
-	capacity int
+	currentCapacity int
 }
 
-func NewHashMap[K interface {
-	HashCoder
-	Equals(K) bool
-}, V any]() *HashMap[K, V] {
+func NewHashMap[K Key[K], V any](initialCapacity int) *HashMap[K, V] {
 
 	return &HashMap[K, V]{
-		buckets:     make([]bucket[K, V], 16),
-		currentSize: 0,
-		capacity:    16,
+		buckets:         make([]bucket[K, V], initialCapacity),
+		currentSize:     0,
+		currentCapacity: initialCapacity,
 	}
+}
+
+func (h *HashMap[K, V]) maybeGrow() {
+	var loadFactor = 0.75
+	if h.currentSize >= int(float64(h.currentCapacity)*loadFactor) {
+		newBuckets := make([]bucket[K, V], h.currentCapacity*2)
+
+		for i := range h.buckets {
+			for d := range h.buckets[i].slots {
+				hash := h.buckets[i].slots[d].hash
+				idx := hash % uint64(len(newBuckets))
+
+				newBuckets[idx].slots = append(newBuckets[idx].slots, h.buckets[i].slots[d])
+			}
+		}
+
+		h.buckets = newBuckets
+
+		h.currentCapacity = len(h.buckets)
+	}
+
 }
 
 // insert inserts a new entry into the bucket
-func (h *HashMap[K, V]) insert(bucket *bucket[K, V], key K, value V) {
+func (h *HashMap[K, V]) insert(b *bucket[K, V], key K, value V, hash uint64) {
+	b.slots = append(b.slots, slot[K, V]{key, value, hash})
 
-	// Check if we need to grow
-	loadFactor := 0.75
-
-	if h.currentSize >= int(float64(h.capacity)*loadFactor) {
-		fmt.Println("Increase", loadFactor, h.currentSize, h.capacity)
-
-		// need to grow
-		slices.Grow(h.buckets, h.capacity)
-		h.capacity = h.capacity * 2
-	}
-
-	bucket.slots = append(bucket.slots, slot[K, V]{key, value})
 	h.currentSize++
 }
 
 func (h *HashMap[K, V]) Set(key K, value V) bool {
+	h.maybeGrow()
 	hash := key.HashCode()
 
 	bucket := &h.buckets[hash%uint64(len(h.buckets))]
@@ -74,7 +73,7 @@ func (h *HashMap[K, V]) Set(key K, value V) bool {
 		}
 	}
 
-	h.insert(bucket, key, value)
+	h.insert(bucket, key, value, hash)
 
 	return false
 }
