@@ -62,7 +62,8 @@ func (h *HashMap[K, V]) Set(key K, value V) bool {
 
 	hash := key.HashCode()
 	bucket := &h.buckets[hash%uint64(len(h.buckets))]
-	//
+
+	// Try to update
 	for i := range bucket.slots {
 		if bucket.slots[i].key.Equals(key) {
 			bucket.slots[i].value = value
@@ -70,9 +71,8 @@ func (h *HashMap[K, V]) Set(key K, value V) bool {
 		}
 	}
 
+	// Insert new entry
 	bucket.slots = append(bucket.slots, entry[K, V]{key, value, hash})
-	// fmt.Println(len(bucket.slots), h.currentSize)
-
 	h.currentSize++
 
 	return false

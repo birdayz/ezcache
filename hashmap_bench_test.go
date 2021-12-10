@@ -5,7 +5,6 @@ import (
 )
 
 func BenchmarkHashMapSet(b *testing.B) {
-
 	b.Run("Set", func(b *testing.B) {
 		m := NewHashMap[IntKey, int](16)
 		b.ResetTimer()
@@ -33,7 +32,6 @@ func BenchmarkHashMapSet(b *testing.B) {
 }
 
 func BenchmarkGoMapSet(b *testing.B) {
-
 	b.Run("Set", func(b *testing.B) {
 		m := make(map[int]int)
 		b.ResetTimer()

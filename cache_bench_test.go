@@ -37,7 +37,7 @@ func BenchmarkSetInt(b *testing.B) {
 
 	b.ResetTimer()
 	b.Run("Set", func(b *testing.B) {
-		cache := New[IntKey, int](nil, 100, 10000)
+		cache := New[IntKey, int](nil, 10, 16)
 		b.ResetTimer()
 
 		for i := 0; i < b.N; i++ {

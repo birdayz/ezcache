@@ -29,9 +29,14 @@ func newShard[K interface {
 	HashCoder
 }, V comparable](capacity int) *shard[K, V] {
 
+	var initialMapCapacity = capacity
+	if initialMapCapacity < 16 {
+		initialMapCapacity = 16
+	}
+
 	return &shard[K, V]{
 		m:          sync.RWMutex{},
-		dataMap:    NewHashMap[K, *bucketItem[K, V]](16),
+		dataMap:    NewHashMap[K, *bucketItem[K, V]](initialMapCapacity),
 		linkedList: NewList[K](),
 		capacity:   capacity,
 		ttl:        time.Second * 50,
@@ -52,6 +57,8 @@ func (s *shard[K, V]) set(key K, keyHash uint64, value V) {
 	defer s.m.Unlock()
 	s.clean()
 
+	// This could be optimized with a very specific call that does the get and
+	// update at once
 	entry, ok := s.dataMap.Get(key)
 	if !ok {
 
