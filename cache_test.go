@@ -60,3 +60,17 @@ func TestCacheSetSet(t *testing.T) {
 	assert.Equal(t, res, "value2")
 
 }
+
+func TestSetEvict(t *testing.T) {
+	cache := newShard[IntKey, int](3)
+	for i := 0; i < 4; i++ {
+		cache.set(IntKey(i), IntKey(i).HashCode(), i)
+	}
+
+	for i := 1; i < 4; i++ {
+		res, ok := cache.get(IntKey(i), IntKey(i).HashCode())
+		assert.Equal(t, ok, true)
+		assert.Equal(t, res, i)
+	}
+
+}
