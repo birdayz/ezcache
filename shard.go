@@ -12,7 +12,7 @@ var (
 type shard[K interface {
 	Equals(K) bool
 	HashCoder
-}, V comparable] struct {
+}, V any] struct {
 	m sync.RWMutex
 
 	dataMap *HashMap[K, *bucketItem[K, V]]
@@ -27,7 +27,7 @@ type shard[K interface {
 func newShard[K interface {
 	Equals(K) bool
 	HashCoder
-}, V comparable](capacity int) *shard[K, V] {
+}, V any](capacity int) *shard[K, V] {
 
 	var initialMapCapacity = capacity
 	if initialMapCapacity < 16 {
@@ -55,6 +55,7 @@ func newShard[K interface {
 func (s *shard[K, V]) set(key K, keyHash uint64, value V) {
 	s.m.Lock()
 	defer s.m.Unlock()
+
 	s.clean()
 
 	// This could be optimized with a very specific call that does the get and
@@ -151,7 +152,7 @@ func (s *shard[K, V]) delete(key K) bool {
 type bucketItem[K interface {
 	HashCoder
 	Equals(K) bool
-}, V comparable] struct {
+}, V any] struct {
 	value V
 
 	expireAfter time.Time

@@ -8,7 +8,7 @@ import (
 )
 
 func TestSetGetInt(t *testing.T) {
-	cache := New[IntKey, int](nil, 10, 10)
+	cache := NewBuilder[IntKey, int]().NumShards(10).Capacity(10).Build()
 	cache.Set(0, 0)
 	cache.Set(1, 1)
 	cache.Set(2, 2)
@@ -24,7 +24,7 @@ func TestSetGetInt(t *testing.T) {
 }
 
 func TestCacheLoaderLoads(t *testing.T) {
-	cache := New(func(key StringKey) (string, error) { return "test-val", nil }, 10, 10)
+	cache := NewBuilder[StringKey, string]().Loader(func(key StringKey) (string, error) { return "test-val", nil }).Capacity(10).NumShards(10).Build()
 
 	res, err := cache.Get("my-key")
 	assert.NilError(t, err)
@@ -33,14 +33,15 @@ func TestCacheLoaderLoads(t *testing.T) {
 
 func TestCacheLoaderError(t *testing.T) {
 	loaderError := "could not connect to database"
-	cache := New(func(key StringKey) (string, error) { return "", errors.New(loaderError) }, 10, 10)
+	cache := NewBuilder[StringKey, string]().Loader(func(key StringKey) (string, error) { return "", errors.New(loaderError) }).Capacity(10).NumShards(10).Build()
 
 	_, err := cache.Get("my-key")
 	assert.ErrorContains(t, err, loaderError)
 }
 
 func TestCacheDelete(t *testing.T) {
-	cache := New(func(key StringKey) (string, error) { return "", errors.New("dont want to load") }, 10, 10)
+
+	cache := NewBuilder[StringKey, string]().Loader(func(key StringKey) (string, error) { return "", errors.New("dont want to load") }).Capacity(10).NumShards(10).Build()
 	cache.Set("key", "value")
 	res, err := cache.Get("key")
 	assert.NilError(t, err)
@@ -52,7 +53,7 @@ func TestCacheDelete(t *testing.T) {
 }
 
 func TestCacheSetSet(t *testing.T) {
-	cache := New(func(key StringKey) (string, error) { return "", errors.New("dont want to load") }, 10, 10)
+	cache := NewBuilder[StringKey, string]().Loader(func(key StringKey) (string, error) { return "", errors.New("dont want to load") }).Capacity(10).NumShards(10).Build()
 	cache.Set("key", "value")
 	cache.Set("key", "value2")
 	res, err := cache.Get("key")

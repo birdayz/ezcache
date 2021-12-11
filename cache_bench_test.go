@@ -12,7 +12,15 @@ func BenchmarkSetString(b *testing.B) {
 
 	b.ResetTimer()
 	b.Run("Set", func(b *testing.B) {
-		cache := New[StringKey, string](nil, 100, 10000)
+
+		cache := NewBuilder[StringKey, string]().Capacity(1000).Build()
+
+		// cache := New[StringKey, string](
+		// 	WithLoader(func(key StringKey) (string, error) { return "", nil }),
+		// 	WithShards(100),
+		// 	WithCapacity(10000),
+		// )
+
 		b.ResetTimer()
 
 		for i := 0; i < b.N; i++ {
@@ -20,7 +28,7 @@ func BenchmarkSetString(b *testing.B) {
 		}
 	})
 	b.Run("Get", func(b *testing.B) {
-		cache := New[StringKey, string](nil, 100, 10000)
+		cache := NewBuilder[StringKey, string]().Capacity(10000).NumShards(100).Build()
 
 		for i := 0; i < b.N; i++ {
 			cache.Set(StringKey(strconv.Itoa(i)), strconv.Itoa(i))
@@ -37,7 +45,7 @@ func BenchmarkSetInt(b *testing.B) {
 
 	b.ResetTimer()
 	b.Run("Set", func(b *testing.B) {
-		cache := New[IntKey, int](nil, 10, 16)
+		cache := NewBuilder[IntKey, int]().Capacity(16).NumShards(10).Build()
 		b.ResetTimer()
 
 		for i := 0; i < b.N; i++ {
@@ -45,7 +53,7 @@ func BenchmarkSetInt(b *testing.B) {
 		}
 	})
 	b.Run("Get", func(b *testing.B) {
-		cache := New[IntKey, int](nil, 1, 10000)
+		cache := NewBuilder[IntKey, int]().Capacity(10000).NumShards(1).Build()
 		for i := 0; i < b.N; i++ {
 			cache.Set(IntKey(i), i)
 		}
@@ -118,7 +126,7 @@ func BenchmarkParallelSet(b *testing.B) {
 			itemsPerWorker := tt.itemsPerWorker
 			buckets := tt.buckets
 
-			cache := New[IntKey, StringKey](nil, buckets, 100000)
+			cache := NewBuilder[IntKey, StringKey]().NumShards(buckets).Capacity(100000).Build()
 
 			data := make(map[int][]int) // one entry per worker
 

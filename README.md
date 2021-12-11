@@ -22,6 +22,7 @@
 - Frequently used vs Recently; auto refresh top frequently used? frequently more realistic?
 - refresh only frequent, but not recent data?
 - bloomfilter
+- copy key?
 
 
 ## TBD

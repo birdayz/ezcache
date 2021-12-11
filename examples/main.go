@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"reflect"
 
@@ -26,29 +25,15 @@ func (t *TestKey) HashCode() uint64 {
 }
 
 func main() {
-	a := ezcache.New(
-		func(key *TestKey) (*[]string, error) {
-			x := []string{"value"}
-			return &x, nil
-		},
-		2,
-		10,
-	)
+	cache := ezcache.NewBuilder[*TestKey, []string]().Capacity(10).NumShards(2).Build()
 
 	k := &TestKey{
 		blah: 0,
 		bleh: "",
 	}
 
-	a.Set(k, &[]string{"my-value"})
+	cache.Set(k, []string{"my-value"})
 
-	res, err := a.Get(k)
+	res, err := cache.Get(k)
 	fmt.Println(res, err)
-
-	{
-		b := ezcache.New(func(key ezcache.StringKey) (string, error) { return "dsad", errors.New("fail") }, 256, 10)
-
-		back, _ := b.Get("abc")
-		fmt.Println("Got back", back)
-	}
 }

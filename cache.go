@@ -7,38 +7,66 @@ import (
 
 var ErrNotFound = errors.New("not found")
 
+type CacheConfig[K Key[K], V any] struct {
+	capacity  int
+	numShards int
+	loader    LoaderFn[K, V]
+}
+
+func NewBuilder[K Key[K], V any]() *CacheConfig[K, V] {
+	return &CacheConfig[K, V]{
+		capacity:  1024,
+		numShards: 1,
+	}
+}
+
+func (cb *CacheConfig[K, V]) Capacity(capacity int) *CacheConfig[K, V] {
+	cb.capacity = capacity
+	return cb
+}
+
+func (cb *CacheConfig[K, V]) NumShards(numShards int) *CacheConfig[K, V] {
+	cb.numShards = numShards
+	return cb
+}
+
+func (cb *CacheConfig[K, V]) Loader(loader LoaderFn[K, V]) *CacheConfig[K, V] {
+	cb.loader = loader
+	return cb
+}
+
+func (cb *CacheConfig[K, V]) Build() *Cache[K, V] {
+	return New[K, V](cb)
+}
+
 type HashCoder interface {
 	HashCode() uint64
 }
 
-func New[K interface {
-	HashCoder
-	Equals(K) bool
-}, V comparable](loader LoaderFn[K, V], numShards int, capacity int) *Cache[K, V] {
-	shards := make([]*shard[K, V], 0, numShards)
-
-	for i := 0; i < numShards; i++ {
-		newShard := newShard[K, V]((capacity / numShards) + 1)
-		shards = append(shards, newShard)
+func New[K Key[K], V any](cfg *CacheConfig[K, V]) *Cache[K, V] {
+	cache := Cache[K, V]{
+		loaderFn:  cfg.loader,
+		numShards: cfg.numShards,
+		capacity:  cfg.capacity,
 	}
 
-	return &Cache[K, V]{
-		loaderFn: loader,
-		shards:   shards,
+	shards := make([]*shard[K, V], 0, cache.numShards)
+	for i := 0; i < cache.numShards; i++ {
+		newShard := newShard[K, V]((cache.capacity / cache.numShards) + 1)
+		cache.shards = append(shards, newShard)
 	}
+
+	return &cache
 }
 
-type LoaderFn[K interface {
-	HashCoder
-	Equals(K) bool
-}, V any] func(key K) (value V, err error)
+type LoaderFn[K Key[K], V any] func(key K) (value V, err error)
 
-type Cache[K interface {
-	HashCoder
-	Equals(K) bool
-}, V comparable] struct {
-	loaderFn LoaderFn[K, V]
-	shards   []*shard[K, V]
+type Cache[K Key[K], V any] struct {
+	loaderFn  LoaderFn[K, V]
+	numShards int
+	capacity  int
+
+	shards []*shard[K, V]
 }
 
 func (c *Cache[K, V]) getShard(hash uint64) *shard[K, V] {
