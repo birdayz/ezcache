@@ -7,7 +7,7 @@ import (
 )
 
 func TestHeap(t *testing.T) {
-	h := NewHeap(AscendingComparator[int])
+	h := NewHeap(AscendingComparator[int], 0)
 
 	h.Push(100)
 	h.Push(1)

@@ -1,6 +1,8 @@
 package ezcache
 
-import "constraints"
+import (
+	"constraints"
+)
 
 type HeapElement[T any] struct {
 	index int
@@ -12,10 +14,10 @@ type Heap[T any] struct {
 	data       []*HeapElement[T]
 }
 
-func NewHeap[T any](comparator Comparator[T]) *Heap[T] {
+func NewHeap[T any](comparator Comparator[T], initialCapacity int) *Heap[T] {
 	return &Heap[T]{
 		comparator: comparator,
-		data:       make([]*HeapElement[T], 0, 0),
+		data:       make([]*HeapElement[T], 0, initialCapacity),
 	}
 }
 
