@@ -30,3 +30,5 @@
 - LoaderFn where previous value is known
 - What about ctx?
 - Reduce number of hash func calls
+- Allow unlimited capacity?
+- Allow unlimited TTL

@@ -16,13 +16,7 @@ func BenchmarkSetString(b *testing.B) {
 		var oldMemProfileRate = runtime.MemProfileRate
 		runtime.MemProfileRate = 0
 
-		cache := NewBuilder[StringKey, string]().Capacity(10000).Build()
-
-		// cache := New[StringKey, string](
-		// 	WithLoader(func(key StringKey) (string, error) { return "", nil }),
-		// 	WithShards(100),
-		// 	WithCapacity(10000),
-		// )
+		cache := NewBuilder[StringKey, string]().Capacity(2048).Build()
 
 		b.ResetTimer()
 		runtime.MemProfileRate = oldMemProfileRate
@@ -35,7 +29,7 @@ func BenchmarkSetString(b *testing.B) {
 		var oldMemProfileRate = runtime.MemProfileRate
 		runtime.MemProfileRate = 0
 
-		cache := NewBuilder[StringKey, string]().Capacity(10000).NumShards(100).Build()
+		cache := NewBuilder[StringKey, string]().Capacity(16).NumShards(100).Build()
 
 		for i := 0; i < b.N; i++ {
 			cache.Set(StringKey(strconv.Itoa(i)), strconv.Itoa(i))
@@ -54,23 +48,33 @@ func BenchmarkSetInt(b *testing.B) {
 
 	b.ResetTimer()
 	b.Run("Set", func(b *testing.B) {
-		cache := NewBuilder[IntKey, int]().Capacity(16).NumShards(10).Build()
+		var oldMemProfileRate = runtime.MemProfileRate
+		runtime.MemProfileRate = 0
+
+		cache := NewBuilder[IntKey, int]().Capacity(20000000).Build()
+
 		b.ResetTimer()
+		runtime.MemProfileRate = oldMemProfileRate
 
 		for i := 0; i < b.N; i++ {
 			cache.Set(IntKey(i), i)
 		}
 	})
 	b.Run("Get", func(b *testing.B) {
-		cache := NewBuilder[IntKey, int]().Capacity(10000).NumShards(1).Build()
+		var oldMemProfileRate = runtime.MemProfileRate
+		runtime.MemProfileRate = 0
+
+		cache := NewBuilder[IntKey, int]().Capacity(10000).NumShards(100).Build()
+
 		for i := 0; i < b.N; i++ {
 			cache.Set(IntKey(i), i)
 		}
 
 		b.ResetTimer()
+		runtime.MemProfileRate = oldMemProfileRate
 
 		for i := 0; i < b.N; i++ {
-			cache.Get(IntKey(i))
+			_, _ = cache.Get(IntKey(i))
 		}
 	})
 }

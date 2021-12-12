@@ -176,17 +176,28 @@ func TestExpireTTLProlongedAfterSet(t *testing.T) {
 	shard := newShard[StringKey, string](10)
 	shard.ttl = time.Millisecond * 10
 
+	var fakeTime time.Time
+
+	// "Inject" fake time
+	timeFn := func() time.Time {
+		return fakeTime
+	}
+	timeNow = timeFn
+	defer func() { timeNow = time.Now }()
+
+	fakeTime = time.Now()
+
 	abc := StringKey("abc")
 	def := StringKey("def")
 	shard.set("abc", abc.HashCode(), "def")
 	shard.set(def, def.HashCode(), "def2")
 
-	time.Sleep(time.Millisecond * 5) // TODO, replace timing based tests with mocked/mock-able clock
+	fakeTime = fakeTime.Add(time.Millisecond * 5)
 	_, ok := shard.get("abc", abc.HashCode())
 	assert.Equal(t, ok, true)
 
 	shard.set("abc", abc.HashCode(), "defNew")
-	time.Sleep(time.Millisecond * 5) // TODO, replace timing based tests with mocked/mock-able clock
+	fakeTime = fakeTime.Add(time.Millisecond * 5)
 
 	// Check if the first item, which was touched, is still around
 	_, ok = shard.get("abc", abc.HashCode())
@@ -194,5 +205,33 @@ func TestExpireTTLProlongedAfterSet(t *testing.T) {
 
 	// Check if the second item, which we did not touch, was remove successfully
 	_, ok = shard.get(def, def.HashCode())
+	assert.Equal(t, ok, false)
+}
+
+func TestExpireTTLExact(t *testing.T) {
+	shard := newShard[StringKey, string](10)
+	shard.ttl = time.Millisecond * 1
+
+	var fakeTime time.Time
+
+	// "Inject" fake time
+	timeFn := func() time.Time {
+		return fakeTime
+	}
+	timeNow = timeFn
+	defer func() { timeNow = time.Now }()
+
+	fakeTime = time.Now()
+
+	abc := StringKey("abc")
+	shard.set(abc, abc.HashCode(), "def")
+
+	_, ok := shard.get(abc, abc.HashCode())
+	assert.Equal(t, ok, true)
+
+	fakeTime = fakeTime.Add(time.Millisecond * 1)
+
+	// Check if the first item, which was touched, is still around
+	_, ok = shard.get("abc", abc.HashCode())
 	assert.Equal(t, ok, false)
 }

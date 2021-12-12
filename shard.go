@@ -41,13 +41,14 @@ func newShard[K interface {
 		capacity:   capacity,
 		ttl:        time.Second * 50,
 		ttls: NewHeap(func(t1, t2 *bucketItem[K, V]) int {
-			if t1.expireAfter.After(t2.expireAfter) {
+			if t1.expireAt > t2.expireAt {
 				return 1
-			} else if t1.expireAfter.Before(t2.expireAfter) {
+			} else if t1.expireAt < t2.expireAt {
 				return -1
 			}
+
 			return 0
-		}),
+		}, capacity),
 	}
 }
 
@@ -73,7 +74,7 @@ func (s *shard[K, V]) set(key K, keyHash uint64, value V) {
 
 		newItem := bucketItem[K, V]{
 			value:       value,
-			expireAfter: timeNow().Add(s.ttl),
+			expireAt:    timeNow().Add(s.ttl).UnixMilli(),
 			node:        newElement,
 			heapElement: nil,
 		}
@@ -85,7 +86,7 @@ func (s *shard[K, V]) set(key K, keyHash uint64, value V) {
 		return
 
 	} else {
-		entry.expireAfter = timeNow().Add(s.ttl) // TODO: store ttls somewhere else, not in the map entry
+		entry.expireAt = timeNow().Add(s.ttl).UnixMilli() // TODO: store ttls somewhere else, not in the map entry
 		entry.value = value
 		s.ttls.Fix(entry.heapElement)
 		s.linkedList.MoveToFront(entry.node)
@@ -100,7 +101,7 @@ func (s *shard[K, V]) clean() {
 		}
 
 		item := s.ttls.Peek()
-		if item.Item.expireAfter.Before(timeNow()) {
+		if item.Item.expireAt <= timeNow().UnixMilli() {
 			// remove item
 			res := s.delete(item.Item.node.Value)
 			if !res {
@@ -155,7 +156,7 @@ type bucketItem[K interface {
 }, V any] struct {
 	value V
 
-	expireAfter time.Time
+	expireAt int64 // exact timestamp, at which the entry is considered expired
 
 	// LinkedList node pointer, used for LRU eviction
 	node *Element[K]
