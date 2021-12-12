@@ -3,6 +3,7 @@ package ezcache
 import (
 	"fmt"
 	"math/rand"
+	"runtime"
 	"strconv"
 	"sync"
 	"testing"
@@ -12,8 +13,10 @@ func BenchmarkSetString(b *testing.B) {
 
 	b.ResetTimer()
 	b.Run("Set", func(b *testing.B) {
+		var oldMemProfileRate = runtime.MemProfileRate
+		runtime.MemProfileRate = 0
 
-		cache := NewBuilder[StringKey, string]().Capacity(1000).Build()
+		cache := NewBuilder[StringKey, string]().Capacity(10000).Build()
 
 		// cache := New[StringKey, string](
 		// 	WithLoader(func(key StringKey) (string, error) { return "", nil }),
@@ -22,12 +25,16 @@ func BenchmarkSetString(b *testing.B) {
 		// )
 
 		b.ResetTimer()
+		runtime.MemProfileRate = oldMemProfileRate
 
 		for i := 0; i < b.N; i++ {
 			cache.Set(StringKey(strconv.Itoa(i)), "")
 		}
 	})
 	b.Run("Get", func(b *testing.B) {
+		var oldMemProfileRate = runtime.MemProfileRate
+		runtime.MemProfileRate = 0
+
 		cache := NewBuilder[StringKey, string]().Capacity(10000).NumShards(100).Build()
 
 		for i := 0; i < b.N; i++ {
@@ -35,6 +42,8 @@ func BenchmarkSetString(b *testing.B) {
 		}
 
 		b.ResetTimer()
+		runtime.MemProfileRate = oldMemProfileRate
+
 		for i := 0; i < b.N; i++ {
 			_, _ = cache.Get(StringKey(strconv.Itoa(i)))
 		}

@@ -16,18 +16,21 @@ func (t TestKey) String() string {
 	return t.bleh
 }
 
-func (t *TestKey) Equals(other *TestKey) bool {
+func (t TestKey) Equals(other TestKey) bool {
 	return reflect.DeepEqual(t, other)
 }
 
-func (t *TestKey) HashCode() uint64 {
+func (t TestKey) HashCode() uint64 {
 	return uint64(0)
 }
 
 func main() {
-	cache := ezcache.NewBuilder[*TestKey, []string]().Capacity(10).NumShards(2).Build()
+	cache := ezcache.NewBuilder[TestKey, []string]().
+		Capacity(10).
+		NumShards(2).
+		Build()
 
-	k := &TestKey{
+	k := TestKey{
 		blah: 0,
 		bleh: "",
 	}
