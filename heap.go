@@ -58,9 +58,9 @@ func (t *Heap[T]) Push(item T) *HeapElement[T] {
 		Item: item,
 	}
 	t.data = append(t.data, hi)
-	t.up(len(t.data) - 1)
 
 	hi.index = len(t.data) - 1
+	t.up(len(t.data) - 1)
 
 	return hi
 }
