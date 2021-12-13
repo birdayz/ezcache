@@ -57,10 +57,8 @@ func (h *HashMap[K, V]) maybeGrow() {
 
 }
 
-func (h *HashMap[K, V]) Set(key K, value V) bool {
+func (h *HashMap[K, V]) SetH(key K, value V, hash uint64) bool {
 	h.maybeGrow()
-
-	hash := key.HashCode()
 	bucket := &h.buckets[hash%uint64(len(h.buckets))]
 
 	// Try to update
@@ -78,9 +76,17 @@ func (h *HashMap[K, V]) Set(key K, value V) bool {
 	return false
 }
 
+func (h *HashMap[K, V]) Set(key K, value V) bool {
+	hash := key.HashCode()
+	return h.SetH(key, value, hash)
+}
+
 func (h *HashMap[K, V]) Get(key K) (value V, found bool) {
 	hash := key.HashCode()
+	return h.GetH(key, hash)
+}
 
+func (h *HashMap[K, V]) GetH(key K, hash uint64) (value V, found bool) {
 	bucket := &h.buckets[hash%uint64(len(h.buckets))]
 
 	for i := range bucket.slots {
@@ -94,7 +100,10 @@ func (h *HashMap[K, V]) Get(key K) (value V, found bool) {
 
 func (h *HashMap[K, V]) Delete(key K) (prev V, deleted bool) {
 	hash := key.HashCode()
+	return h.DeleteH(key, hash)
+}
 
+func (h *HashMap[K, V]) DeleteH(key K, hash uint64) (prev V, deleted bool) {
 	bucket := &h.buckets[hash%uint64(len(h.buckets))]
 
 	for i := range bucket.slots {

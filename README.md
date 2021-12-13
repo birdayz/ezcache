@@ -25,10 +25,44 @@
 - copy key?
 
 
-## TBD
+## TBD/TODO
 - Cache errors, when would you want to have this?
 - LoaderFn where previous value is known
 - What about ctx?
 - Reduce number of hash func calls
 - Allow unlimited capacity?
 - Allow unlimited TTL
+- Try to not alloc for LinkedList/Heap - we could use the same pointer as for bucketItem, but add relevant methods for LL/Heap operations.
+- LinkedList should be pointer to bucketItem ? then deletes can avoid hashing key again.
+
+## Performance
+
+```
+goos: linux
+goarch: amd64
+pkg: github.com/birdayz/ezcache
+cpu: AMD Ryzen 9 3900X 12-Core Processor
+BenchmarkSetString/Set-24         	10000000	       691.6 ns/op	     276 B/op	       7 allocs/op
+BenchmarkSetString/Set-24         	10000000	       684.9 ns/op	     276 B/op	       7 allocs/op
+BenchmarkSetString/Set-24         	10000000	       701.2 ns/op	     276 B/op	       7 allocs/op
+BenchmarkSetString/Set-24         	10000000	       711.4 ns/op	     276 B/op	       7 allocs/op
+BenchmarkSetString/Set-24         	10000000	       701.0 ns/op	     276 B/op	       7 allocs/op
+BenchmarkSetString/Get-24         	10000000	       259.6 ns/op	      23 B/op	       1 allocs/op
+BenchmarkSetString/Get-24         	10000000	       253.7 ns/op	      23 B/op	       1 allocs/op
+BenchmarkSetString/Get-24         	10000000	       260.4 ns/op	      23 B/op	       1 allocs/op
+BenchmarkSetString/Get-24         	10000000	       251.7 ns/op	      23 B/op	       1 allocs/op
+BenchmarkSetString/Get-24         	10000000	       257.0 ns/op	      23 B/op	       1 allocs/op
+BenchmarkSetInt/Set-24            	10000000	       439.6 ns/op	     208 B/op	       6 allocs/op
+BenchmarkSetInt/Set-24            	10000000	       441.9 ns/op	     208 B/op	       6 allocs/op
+BenchmarkSetInt/Set-24            	10000000	       445.4 ns/op	     208 B/op	       6 allocs/op
+BenchmarkSetInt/Set-24            	10000000	       431.5 ns/op	     208 B/op	       6 allocs/op
+BenchmarkSetInt/Set-24            	10000000	       439.8 ns/op	     208 B/op	       6 allocs/op
+BenchmarkSetInt/Get-24            	10000000	        82.50 ns/op	       7 B/op	       0 allocs/op
+BenchmarkSetInt/Get-24            	10000000	        79.30 ns/op	       7 B/op	       0 allocs/op
+BenchmarkSetInt/Get-24            	10000000	        79.43 ns/op	       8 B/op	       0 allocs/op
+BenchmarkSetInt/Get-24            	10000000	        82.02 ns/op	       7 B/op	       0 allocs/op
+BenchmarkSetInt/Get-24            	10000000	        82.85 ns/op	       7 B/op	       0 allocs/op
+PASS
+ok  	github.com/birdayz/ezcache	134.206s
+```
+

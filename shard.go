@@ -54,14 +54,12 @@ func newShard[K interface {
 
 // set returns true if the value existed before
 func (s *shard[K, V]) set(key K, keyHash uint64, value V) {
-	s.m.Lock()
-	defer s.m.Unlock()
 
 	s.clean()
 
 	// This could be optimized with a very specific call that does the get and
 	// update at once
-	entry, ok := s.dataMap.Get(key)
+	entry, ok := s.dataMap.GetH(key, keyHash)
 	if !ok {
 
 		if s.linkedList.Len() >= s.capacity {
@@ -81,7 +79,7 @@ func (s *shard[K, V]) set(key K, keyHash uint64, value V) {
 
 		newHeapItem := s.ttls.Push(&newItem)
 		newItem.heapElement = newHeapItem
-		s.dataMap.Set(key, &newItem)
+		s.dataMap.SetH(key, &newItem, keyHash)
 
 		return
 
@@ -90,7 +88,7 @@ func (s *shard[K, V]) set(key K, keyHash uint64, value V) {
 		entry.value = value
 		s.ttls.Fix(entry.heapElement)
 		s.linkedList.MoveToFront(entry.node)
-		s.dataMap.Set(key, entry)
+		s.dataMap.SetH(key, entry, keyHash)
 	}
 }
 
@@ -119,7 +117,7 @@ func (s *shard[K, V]) get(key K, keyHash uint64) (V, bool) {
 
 	s.clean()
 
-	data, ok := s.dataMap.Get(key)
+	data, ok := s.dataMap.GetH(key, keyHash)
 	if !ok {
 		return *new(V), false
 	}

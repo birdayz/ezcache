@@ -36,7 +36,7 @@ func (cb *CacheConfig[K, V]) Loader(loader LoaderFn[K, V]) *CacheConfig[K, V] {
 }
 
 func (cb *CacheConfig[K, V]) Build() *Cache[K, V] {
-	return New[K, V](cb)
+	return New(cb)
 }
 
 type HashCoder interface {
