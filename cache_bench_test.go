@@ -10,7 +10,7 @@ import (
 )
 
 func BenchmarkSetString(b *testing.B) {
-	cfg := NewBuilder[StringKey, string]().Capacity(10).NumShards(1)
+	cfg := NewBuilder[StringKey, string]().Capacity(b.N / 2).NumShards(1)
 
 	b.ResetTimer()
 	b.Run("Set", func(b *testing.B) {
@@ -43,6 +43,15 @@ func BenchmarkSetString(b *testing.B) {
 			_, _ = cache.Get(StringKey(strconv.Itoa(i)))
 		}
 	})
+}
+
+func BenchmarkSetStringNotFound(b *testing.B) {
+	cache := NewBuilder[StringKey, string]().Capacity(b.N).NumShards(1).Build()
+
+	for i := 0; i < b.N; i++ {
+		_, _ = cache.Get(StringKey(strconv.Itoa(i)))
+	}
+
 }
 
 func BenchmarkSetInt(b *testing.B) {
