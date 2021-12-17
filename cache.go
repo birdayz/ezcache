@@ -3,6 +3,7 @@ package ezcache
 import (
 	"errors"
 	"fmt"
+	"time"
 )
 
 var ErrNotFound = errors.New("not found")
@@ -10,6 +11,7 @@ var ErrNotFound = errors.New("not found")
 type CacheConfig[K Key[K], V any] struct {
 	capacity  int
 	numShards int
+	ttl       time.Duration
 	loader    LoaderFn[K, V]
 }
 
@@ -17,6 +19,7 @@ func NewBuilder[K Key[K], V any]() *CacheConfig[K, V] {
 	return &CacheConfig[K, V]{
 		capacity:  1024,
 		numShards: 1,
+		ttl:       time.Hour * 1,
 	}
 }
 
@@ -32,6 +35,11 @@ func (cb *CacheConfig[K, V]) NumShards(numShards int) *CacheConfig[K, V] {
 
 func (cb *CacheConfig[K, V]) Loader(loader LoaderFn[K, V]) *CacheConfig[K, V] {
 	cb.loader = loader
+	return cb
+}
+
+func (cb *CacheConfig[K, V]) TTL(ttl time.Duration) *CacheConfig[K, V] {
+	cb.ttl = ttl
 	return cb
 }
 
@@ -52,7 +60,7 @@ func New[K Key[K], V any](cfg *CacheConfig[K, V]) *Cache[K, V] {
 
 	cache.shards = make([]*shard[K, V], 0, cache.numShards)
 	for i := 0; i < int(cache.numShards); i++ {
-		newShard := newShard[K, V]((cache.capacity / int(cache.numShards)) + 1)
+		newShard := newShard[K, V]((cache.capacity/int(cache.numShards))+1, cfg.ttl)
 		cache.shards = append(cache.shards, newShard)
 	}
 

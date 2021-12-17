@@ -8,7 +8,7 @@ import (
 )
 
 func TestGet(t *testing.T) {
-	shard := newShard[StringKey, string](10)
+	shard := newShard[StringKey, string](10, time.Hour)
 	abc := StringKey("abc")
 
 	shard.set("abc", abc.HashCode(), "def")
@@ -19,7 +19,7 @@ func TestGet(t *testing.T) {
 }
 
 func TestSetGetEvict(t *testing.T) {
-	shard := newShard[StringKey, string](2)
+	shard := newShard[StringKey, string](2, time.Hour*1)
 	first := StringKey("first")
 
 	shard.set("first", first.HashCode(), "def")
@@ -45,7 +45,7 @@ func TestSetGetEvict(t *testing.T) {
 }
 
 func TestSetGetEvictOrder(t *testing.T) {
-	shard := newShard[StringKey, string](2)
+	shard := newShard[StringKey, string](2, time.Hour*1)
 
 	first := StringKey("first")
 	shard.set("first", first.HashCode(), "def")
@@ -78,7 +78,7 @@ func TestSetGetEvictOrder(t *testing.T) {
 }
 
 func TestGetDoesNotExist(t *testing.T) {
-	shard := newShard[StringKey, string](10)
+	shard := newShard[StringKey, string](10, time.Hour*1)
 
 	doesnotexist := StringKey("doesnotexist")
 	res, ok := shard.get("doesnotexist", doesnotexist.HashCode())
@@ -88,7 +88,7 @@ func TestGetDoesNotExist(t *testing.T) {
 }
 
 func TestDelete(t *testing.T) {
-	shard := newShard[StringKey, string](10)
+	shard := newShard[StringKey, string](10, time.Hour*1)
 
 	abc := StringKey("abc")
 	shard.set("abc", abc.HashCode(), "def")
@@ -117,7 +117,7 @@ func (f fake) Equals(f2 fake) bool {
 func (f fake) HashCode() uint64 { return f.hashCode }
 
 func TestDeleteSameHashCode(t *testing.T) {
-	shard := newShard[fake, string](10)
+	shard := newShard[fake, string](10, time.Hour*1)
 
 	abc := fake{"abc", 0}
 	shard.set(abc, abc.HashCode(), "val1")
@@ -148,7 +148,7 @@ func TestDeleteSameHashCode(t *testing.T) {
 }
 
 func TestExpireTTL(t *testing.T) {
-	shard := newShard[StringKey, string](10)
+	shard := newShard[StringKey, string](10, time.Hour*1)
 	shard.ttl = time.Millisecond * 10
 
 	var fakeTime time.Time
@@ -173,8 +173,7 @@ func TestExpireTTL(t *testing.T) {
 }
 
 func TestExpireTTLProlongedAfterSet(t *testing.T) {
-	shard := newShard[StringKey, string](10)
-	shard.ttl = time.Millisecond * 10
+	shard := newShard[StringKey, string](10, time.Millisecond*10)
 
 	var fakeTime time.Time
 
@@ -209,8 +208,7 @@ func TestExpireTTLProlongedAfterSet(t *testing.T) {
 }
 
 func TestExpireTTLExact(t *testing.T) {
-	shard := newShard[StringKey, string](10)
-	shard.ttl = time.Millisecond * 1
+	shard := newShard[StringKey, string](10, time.Millisecond*1)
 
 	var fakeTime time.Time
 

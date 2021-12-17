@@ -15,20 +15,19 @@ type shard[K interface {
 }, V any] struct {
 	m sync.RWMutex
 
-	dataMap *HashMap[K, *bucketItem[K, V]]
+	dataMap *HashMap[K, *cacheEntry[K, V]]
 
 	linkedList *List[K]
 	capacity   int
-	ttl        time.Duration
 
-	ttls *Heap[*bucketItem[K, V]]
+	ttl  time.Duration
+	ttls *Heap[*cacheEntry[K, V]]
 }
 
 func newShard[K interface {
 	Equals(K) bool
 	HashCoder
-}, V any](capacity int) *shard[K, V] {
-
+}, V any](capacity int, ttl time.Duration) *shard[K, V] {
 	var initialMapCapacity = capacity
 	if initialMapCapacity < 16 {
 		initialMapCapacity = 16
@@ -36,11 +35,11 @@ func newShard[K interface {
 
 	return &shard[K, V]{
 		m:          sync.RWMutex{},
-		dataMap:    NewHashMap[K, *bucketItem[K, V]](initialMapCapacity),
+		dataMap:    NewHashMap[K, *cacheEntry[K, V]](initialMapCapacity),
 		linkedList: NewList[K](),
 		capacity:   capacity,
-		ttl:        time.Second * 50,
-		ttls: NewHeap(func(t1, t2 *bucketItem[K, V]) int {
+		ttl:        ttl,
+		ttls: NewHeap(func(t1, t2 *cacheEntry[K, V]) int {
 			if t1.expireAt > t2.expireAt {
 				return 1
 			} else if t1.expireAt < t2.expireAt {
@@ -54,6 +53,8 @@ func newShard[K interface {
 
 // set returns true if the value existed before
 func (s *shard[K, V]) set(key K, keyHash uint64, value V) {
+	s.m.Lock()
+	defer s.m.Unlock()
 
 	s.clean()
 
@@ -70,7 +71,7 @@ func (s *shard[K, V]) set(key K, keyHash uint64, value V) {
 		// Not found
 		newElement := s.linkedList.PushFront(key)
 
-		newItem := bucketItem[K, V]{
+		newItem := cacheEntry[K, V]{
 			value:       value,
 			expireAt:    timeNow().Add(s.ttl).UnixMilli(),
 			node:        newElement,
@@ -87,6 +88,7 @@ func (s *shard[K, V]) set(key K, keyHash uint64, value V) {
 		entry.expireAt = timeNow().Add(s.ttl).UnixMilli() // TODO: store ttls somewhere else, not in the map entry
 		entry.value = value
 		s.ttls.Fix(entry.heapElement)
+		// Es wird ein bereits removed ding wieder benutzt
 		s.linkedList.MoveToFront(entry.node)
 		s.dataMap.SetH(key, entry, keyHash)
 	}
@@ -148,7 +150,7 @@ func (s *shard[K, V]) delete(key K) bool {
 
 // bucket
 
-type bucketItem[K interface {
+type cacheEntry[K interface {
 	HashCoder
 	Equals(K) bool
 }, V any] struct {
@@ -160,5 +162,5 @@ type bucketItem[K interface {
 	node *Element[K]
 
 	// Pointer to heap item, used for TTL
-	heapElement *HeapElement[*bucketItem[K, V]]
+	heapElement *HeapElement[*cacheEntry[K, V]]
 }

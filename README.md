@@ -23,6 +23,11 @@
 - refresh only frequent, but not recent data?
 - bloomfilter
 - copy key?
+- More flexible expiry + evict + admission policy
+- Split expiration into specific type, to only use it if needed. Expiration manager?
+- CacheLoader: reload
+- Singleflight
+- Expiration optional
 
 
 ## TBD/TODO
@@ -34,10 +39,12 @@
 - Allow unlimited TTL
 - Try to not alloc for LinkedList/Heap - we could use the same pointer as for bucketItem, but add relevant methods for LL/Heap operations.
 - LinkedList should be pointer to bucketItem ? then deletes can avoid hashing key again.
+- Cached timer! every 1s/ms
 
 ## Performance
 
 ```
+go test -benchtime=10000000x -run='^$' -bench=BenchmarkSet -benchmem -memprofile memprofile.out -cpuprofile profile.out -count=5
 goos: linux
 goarch: amd64
 pkg: github.com/birdayz/ezcache
@@ -65,4 +72,5 @@ BenchmarkSetInt/Get-24            	10000000	        82.85 ns/op	       7 B/op	  
 PASS
 ok  	github.com/birdayz/ezcache	134.206s
 ```
+
 

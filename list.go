@@ -1,217 +1,224 @@
 package ezcache
 
-import (
-	"reflect"
-)
-
-// list is a copy of go's container/list package but with type parameter supported.
-// There is a little difference in implementation where this List's zero value is
-// not ready-to-use; instead, one must call NewList() for initialization
-
-// Node type inside a list
+// Element is an element of a linked list.
 type Element[T any] struct {
+	// Next and previous pointers in the doubly-linked list of elements.
+	// To simplify the implementation, internally a list l is implemented
+	// as a ring, such that &l.root is both the next element of the last
+	// list element (l.Back()) and the previous element of the first list
+	// element (l.Front()).
+	next, prev *Element[T]
+
+	// The list to which this element belongs.
+	list *List[T]
+
+	// The value stored with this element.
 	Value T
-	prev  *Element[T]
-	next  *Element[T]
-	list  *List[T]
 }
 
-// Prev return the prev element if exists, otherwise return nil
-func (e *Element[T]) Prev() *Element[T] {
-	if prev := e.prev; e.list != nil && prev != e.list.sentinel {
-		return prev
-	}
-	return nil
-}
-
-// Next return the next element if exists, otherwise return nil
+// Next returns the next list element or nil.
 func (e *Element[T]) Next() *Element[T] {
-	if next := e.next; e.list != nil && next != e.list.sentinel {
-		return next
+	if p := e.next; e.list != nil && p != &e.list.root {
+		return p
 	}
 	return nil
 }
 
-// A doubly linked list type
-type List[T any] struct {
-	sentinel *Element[T]
-	size     int
+// Prev returns the previous list element or nil.
+func (e *Element[T]) Prev() *Element[T] {
+	if p := e.prev; e.list != nil && p != &e.list.root {
+		return p
+	}
+	return nil
 }
 
-// New initializes an empty List
-func NewList[T any]() *List[T] {
-	sentinel := &Element[T]{}
-	sentinel.prev = sentinel
-	sentinel.next = sentinel
+// List represents a doubly linked list.
+// The zero value for List is an empty list ready to use.
+type List[T any] struct {
+	root Element[T] // sentinel list element, only &root, root.prev, and root.next are used
+	len  int        // current list length excluding (this) sentinel element
+}
 
-	l := &List[T]{
-		sentinel: sentinel,
-		size:     0,
-	}
-	sentinel.list = l
-
+// Init initializes or clears list l.
+func (l *List[T]) Init() *List[T] {
+	l.root.next = &l.root
+	l.root.prev = &l.root
+	l.len = 0
 	return l
 }
 
-// Back return the last element of this list. Return nil if the list is empty
-func (l *List[T]) Back() *Element[T] {
-	return l.sentinel.Prev()
-}
+// New returns an initialized list.
+func NewList[T any]() *List[T] { return new(List[T]).Init() }
 
-// Front return the first element of this list. Return nil if the list is empty
+// Len returns the number of elements of list l.
+// The complexity is O(1).
+func (l *List[T]) Len() int { return l.len }
+
+// Front returns the first element of list l or nil if the list is empty.
 func (l *List[T]) Front() *Element[T] {
-	return l.sentinel.Next()
-}
-
-// Clear all elements in the List.
-func (l *List[T]) Clear() {
-	// Clear pointers pointing to sentinel
-	l.sentinel.next.prev = nil
-	l.sentinel.prev.next = nil
-
-	// Clear all elements in the list
-	l.sentinel.prev = l.sentinel
-	l.sentinel.next = l.sentinel
-	l.size = 0
-}
-
-// Find a specific element with value t inside the list using reflect.DeepEqual method.
-// Return the first occurrence inside the list, or return nil if the element
-// is not in the list
-func (l *List[T]) Find(t T) *Element[T] {
-	for e := l.Front(); e != nil; e = e.Next() {
-		if reflect.DeepEqual(e.Value, t) {
-			return e
-		}
-	}
-	return nil
-}
-
-// InsertAfter inserts a new element with value t after the mark element
-// If mark is not an element of l, the list is not modified.
-// The mark must not be nil.
-func (l *List[T]) InsertAfter(t T, mark *Element[T]) *Element[T] {
-	if mark.list != l {
+	if l.len == 0 {
 		return nil
 	}
-	e := &Element[T]{Value: t}
-	l.insertAfter(e, mark)
-	return e
+	return l.root.next
 }
 
-// InsertBefore inserts a new element with value t before the mark element
-// If mark is not an element of l, the list is not modified.
-// The mark must not be nil.
-func (l *List[T]) InsertBefore(t T, mark *Element[T]) *Element[T] {
-	if mark.list != l {
+// Back returns the last element of list l or nil if the list is empty.
+func (l *List[T]) Back() *Element[T] {
+	if l.len == 0 {
 		return nil
 	}
-	e := &Element[T]{Value: t}
-	l.insertBefore(e, mark)
-	return e
+	return l.root.prev
 }
 
-// Insert e after mark and returns e
-func (l *List[T]) insertAfter(e, mark *Element[T]) *Element[T] {
-	e.next = mark.next
-	e.prev = mark
-	e.next.prev = e
+// lazyInit lazily initializes a zero List value.
+func (l *List[T]) lazyInit() {
+	if l.root.next == nil {
+		l.Init()
+	}
+}
+
+// insert inserts e after at, increments l.len, and returns e.
+func (l *List[T]) insert(e, at *Element[T]) *Element[T] {
+	e.prev = at
+	e.next = at.next
 	e.prev.next = e
-	e.list = l
-	l.size++
-
-	return e
-}
-
-// Insert e before mark and returns e
-func (l *List[T]) insertBefore(e, mark *Element[T]) *Element[T] {
-	e.next = mark
-	e.prev = mark.prev
 	e.next.prev = e
-	e.prev.next = e
 	e.list = l
-	l.size++
-
+	l.len++
 	return e
 }
 
-// Len returns the length of the list
-func (l *List[T]) Len() int {
-	return l.size
+// insertValue is a convenience wrapper for insert(&Element{Value: v}, at).
+func (l *List[T]) insertValue(v T, at *Element[T]) *Element[T] {
+	return l.insert(&Element[T]{Value: v}, at)
 }
 
-// MoveAfter moves element e to its new position after mark.
-// If e or mark is not an element of l, or e == mark, the list is not modified.
-// The element and mark must not be nil.
-func (l *List[T]) MoveAfter(e, mark *Element[T]) {
-	if e.list != l || mark.list != l || e == mark {
+// remove removes e from its list, decrements l.len
+func (l *List[T]) remove(e *Element[T]) {
+	e.prev.next = e.next
+	e.next.prev = e.prev
+	e.next = nil // avoid memory leaks
+	e.prev = nil // avoid memory leaks
+	e.list = nil
+	l.len--
+}
+
+// move moves e to next to at.
+func (l *List[T]) move(e, at *Element[T]) {
+	if e == at {
 		return
 	}
+	e.prev.next = e.next
+	e.next.prev = e.prev
 
-	l.Remove(e)
-	l.insertAfter(e, mark)
+	e.prev = at
+	e.next = at.next
+	e.prev.next = e
+	e.next.prev = e
+}
+
+// Remove removes e from l if e is an element of list l.
+// It returns the element value e.Value.
+// The element must not be nil.
+func (l *List[T]) Remove(e *Element[T]) T {
+	if e.list == l {
+		// if e.list == l, l must have been initialized when e was inserted
+		// in l or l == nil (e is a zero Element) and l.remove will crash
+		l.remove(e)
+	}
+	return e.Value
+}
+
+// PushFront inserts a new element e with value v at the front of list l and returns e.
+func (l *List[T]) PushFront(v T) *Element[T] {
+	l.lazyInit()
+	return l.insertValue(v, &l.root)
+}
+
+// PushBack inserts a new element e with value v at the back of list l and returns e.
+func (l *List[T]) PushBack(v T) *Element[T] {
+	l.lazyInit()
+	return l.insertValue(v, l.root.prev)
+}
+
+// InsertBefore inserts a new element e with value v immediately before mark and returns e.
+// If mark is not an element of l, the list is not modified.
+// The mark must not be nil.
+func (l *List[T]) InsertBefore(v T, mark *Element[T]) *Element[T] {
+	if mark.list != l {
+		return nil
+	}
+	// see comment in List.Remove about initialization of l
+	return l.insertValue(v, mark.prev)
+}
+
+// InsertAfter inserts a new element e with value v immediately after mark and returns e.
+// If mark is not an element of l, the list is not modified.
+// The mark must not be nil.
+func (l *List[T]) InsertAfter(v T, mark *Element[T]) *Element[T] {
+	if mark.list != l {
+		return nil
+	}
+	// see comment in List.Remove about initialization of l
+	return l.insertValue(v, mark)
+}
+
+// MoveToFront moves element e to the front of list l.
+// If e is not an element of l, the list is not modified.
+// The element must not be nil.
+func (l *List[T]) MoveToFront(e *Element[T]) {
+	if e.list != l || l.root.next == e {
+		return
+	}
+	// see comment in List.Remove about initialization of l
+	l.move(e, &l.root)
+}
+
+// MoveToBack moves element e to the back of list l.
+// If e is not an element of l, the list is not modified.
+// The element must not be nil.
+func (l *List[T]) MoveToBack(e *Element[T]) {
+	if e.list != l || l.root.prev == e {
+		return
+	}
+	// see comment in List.Remove about initialization of l
+	l.move(e, l.root.prev)
 }
 
 // MoveBefore moves element e to its new position before mark.
 // If e or mark is not an element of l, or e == mark, the list is not modified.
 // The element and mark must not be nil.
 func (l *List[T]) MoveBefore(e, mark *Element[T]) {
-	if e.list != l || mark.list != l || e == mark {
+	if e.list != l || e == mark || mark.list != l {
 		return
 	}
-
-	l.Remove(e)
-	l.insertBefore(e, mark)
+	l.move(e, mark.prev)
 }
 
-// MoveToBack moves element e to the last element of the list.
-// If e is not an element of lthe list is not modified.
-// The element must not be nil.
-func (l *List[T]) MoveToBack(e *Element[T]) {
-	l.MoveBefore(e, l.sentinel)
+// MoveAfter moves element e to its new position after mark.
+// If e or mark is not an element of l, or e == mark, the list is not modified.
+// The element and mark must not be nil.
+func (l *List[T]) MoveAfter(e, mark *Element[T]) {
+	if e.list != l || e == mark || mark.list != l {
+		return
+	}
+	l.move(e, mark)
 }
 
-// MoveToFront moves element e to the first element of the list.
-// If e is not an element of lthe list is not modified.
-// The element must not be nil.
-func (l *List[T]) MoveToFront(e *Element[T]) {
-	l.MoveAfter(e, l.sentinel)
-}
-
-// PushBack adds an element with value t at the back of the list
-func (l *List[T]) PushBack(t T) *Element[T] {
-	return l.InsertBefore(t, l.sentinel)
-}
-
-// PushBackList adds a list of elements at the back of the list
+// PushBackList inserts a copy of another list at the back of list l.
+// The lists l and other may be the same. They must not be nil.
 func (l *List[T]) PushBackList(other *List[T]) {
-	for e := other.Front(); e != nil; e = e.Next() {
-		l.PushBack(e.Value)
+	l.lazyInit()
+	for i, e := other.Len(), other.Front(); i > 0; i, e = i-1, e.Next() {
+		l.insertValue(e.Value, l.root.prev)
 	}
 }
 
-// PushFront adds an element with value t at the front of the list
-func (l *List[T]) PushFront(t T) *Element[T] {
-	return l.InsertAfter(t, l.sentinel)
-}
-
-// PushFrontList adds a list of elements at the front of the list
+// PushFrontList inserts a copy of another list at the front of list l.
+// The lists l and other may be the same. They must not be nil.
 func (l *List[T]) PushFrontList(other *List[T]) {
-	for e := other.Front(); e != nil; e = e.Next() {
-		l.PushFront(e.Value)
+	l.lazyInit()
+	for i, e := other.Len(), other.Back(); i > 0; i, e = i-1, e.Prev() {
+		l.insertValue(e.Value, &l.root)
 	}
-}
-
-// Remove remove the element from the list and return the value of the element
-// if list does not contain e, nothing will happen
-func (l *List[T]) Remove(e *Element[T]) T {
-	if e.list == l {
-		e.prev.next = e.next
-		e.next.prev = e.prev
-		e.next = nil
-		e.prev = nil
-		e.list = nil
-		l.size--
-	}
-	return e.Value
 }

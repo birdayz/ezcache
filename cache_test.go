@@ -3,6 +3,7 @@ package ezcache
 import (
 	"errors"
 	"testing"
+	"time"
 
 	"gotest.tools/v3/assert"
 )
@@ -63,7 +64,7 @@ func TestCacheSetSet(t *testing.T) {
 }
 
 func TestSetEvict(t *testing.T) {
-	cache := newShard[IntKey, int](3)
+	cache := newShard[IntKey, int](3, time.Hour*1)
 	for i := 0; i < 4; i++ {
 		cache.set(IntKey(i), IntKey(i).HashCode(), i)
 	}
